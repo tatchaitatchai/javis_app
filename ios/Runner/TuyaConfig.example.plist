@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AppKey</key>
+	<string>PASTE_APP_KEY_HERE</string>
+	<key>AppSecret</key>
+	<string>PASTE_APP_SECRET_HERE</string>
+	<!-- Leave false unless Apple has approved multicast for this App ID and
+	     a signed build plus provisioning profile have been verified. -->
+	<key>EnableEZ</key>
+	<false/>
+</dict>
+</plist>

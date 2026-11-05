@@ -1,0 +1,74 @@
+source 'https://cdn.cocoapods.org/'
+source 'https://github.com/TuyaInc/TuyaPublicSpecs.git'
+source 'https://github.com/tuya/tuya-pod-specs.git'
+
+platform :ios, '15.0'
+
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(
+    File.join('..', 'Flutter', 'Generated.xcconfig'),
+    __FILE__,
+  )
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. Run flutter pub get first."
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT is missing from #{generated_xcode_build_settings_path}."
+end
+
+require File.expand_path(
+  File.join('packages', 'flutter_tools', 'bin', 'podhelper'),
+  flutter_root,
+)
+
+flutter_ios_podfile_setup
+
+tuya_cryption_relative_path = './LocalTuya/ios_core_sdk'
+tuya_cryption_path = File.expand_path(tuya_cryption_relative_path, __dir__)
+
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # Generated for JAVIS on the Tuya Developer Platform. The local package is
+  # app-specific and intentionally ignored by Git. Keep clean checkouts usable
+  # for demo UI development when that private package is unavailable.
+  if File.exist?(File.join(tuya_cryption_path, 'ThingSmartCryption.podspec'))
+    pod 'ThingSmartHomeKit', '~> 7.8.0'
+    # Enables Tuya's device-side AP Wi-Fi scan on firmware that supports it.
+    pod 'ThingSmartHotspotCredentialKit', '1.2.0'
+    pod 'ThingSmartCryption', path: tuya_cryption_relative_path
+  else
+    Pod::UI.warn('Tuya private package not found; installing Flutter pods only.')
+  end
+
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      # Several Tuya 7.8 transitive binaries are x86_64-only on Simulator.
+      # Physical iPhone builds continue to use arm64.
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+    end
+  end
+end
