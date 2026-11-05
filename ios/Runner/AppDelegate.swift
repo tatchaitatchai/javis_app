@@ -5,6 +5,7 @@ import UIKit
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var lightingBridge: JavisLightingBridge?
   private var sessionVault: SessionVaultBridge?
+  private var themePreference: ThemePreferenceBridge?
 
   override func application(
     _ application: UIApplication,
@@ -26,6 +27,10 @@ import UIKit
     let vault = SessionVaultBridge(messenger: engineBridge.applicationRegistrar.messenger())
     vault.register()
     sessionVault = vault
+
+    let theme = ThemePreferenceBridge(messenger: engineBridge.applicationRegistrar.messenger())
+    theme.register()
+    themePreference = theme
   }
 }
 

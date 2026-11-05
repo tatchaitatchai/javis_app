@@ -53,24 +53,34 @@ class CalmSegment<T> extends StatelessWidget {
               for (final option in options)
                 Expanded(
                   child: Pressable(
-                    onPressed: onChanged == null || option.$1 == selected
+                    // The selected option stays enabled so it does not dim.
+                    onPressed: onChanged == null
                         ? null
-                        : () => onChanged!(option.$1),
+                        : () {
+                            if (option.$1 != selected) onChanged!(option.$1);
+                          },
                     selected: option.$1 == selected,
                     pressedScale: .97,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(minHeight: 44),
                       child: Center(
-                        child: Text(
-                          option.$2,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: option.$1 == selected
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                            color: option.$1 == selected
-                                ? palette.text
-                                : palette.textMuted,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          // Large text shrinks to fit rather than break a word.
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              option.$2,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: option.$1 == selected
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                                color: option.$1 == selected
+                                    ? palette.text
+                                    : palette.textMuted,
+                              ),
+                            ),
                           ),
                         ),
                       ),

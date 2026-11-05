@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../app_scope.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/motion/motion.dart';
+import '../../core/theme/app_appearance.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/calm_buttons.dart';
 import '../../core/widgets/calm_segment.dart';
@@ -131,7 +132,7 @@ class _MeScreenState extends State<MeScreen> {
                           ),
                         ),
                       ),
-                      ListRow(title: l10n.theme, value: l10n.followSystem),
+                      const _ThemeRow(),
                       ListRow(
                         title: l10n.doorAlerts,
                         subtitle: l10n.doorAlertsPreview,
@@ -205,6 +206,36 @@ class _ProfileCard extends StatelessWidget {
             ),
           ),
           QuietButton(label: context.l10n.edit, onPressed: onEdit),
+        ],
+      ),
+    );
+  }
+}
+
+/// The title sits above the control so Thai labels keep their full width.
+class _ThemeRow extends StatelessWidget {
+  const _ThemeRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final appearance = AppAppearance.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l10n.theme, style: const TextStyle(fontSize: 15.5)),
+          const SizedBox(height: 10),
+          CalmSegment<ThemeMode>(
+            options: [
+              (ThemeMode.system, l10n.themeSystem),
+              (ThemeMode.light, l10n.themeLight),
+              (ThemeMode.dark, l10n.themeDark),
+            ],
+            selected: appearance.themeMode,
+            onChanged: appearance.setThemeMode,
+          ),
         ],
       ),
     );

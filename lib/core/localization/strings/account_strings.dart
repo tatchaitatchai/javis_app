@@ -9,7 +9,9 @@ extension AccountStrings on AppLocalizations {
   String get homeInvites => _t('Home invitations', 'คำเชิญเข้าบ้าน');
   String get usageSection => _t('Using the app', 'การใช้งาน');
   String get theme => _t('Theme', 'ธีม');
-  String get followSystem => _t('Match system', 'ตามระบบ');
+  String get themeSystem => _t('System', 'ตามระบบ');
+  String get themeLight => _t('Light', 'สว่าง');
+  String get themeDark => _t('Dark', 'มืด');
   String get doorAlerts => _t('Door notifications', 'การแจ้งเตือนประตู');
   String get doorAlertsPreview => _t(
     'Preview — no notifications are sent yet',
