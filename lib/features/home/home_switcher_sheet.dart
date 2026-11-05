@@ -55,7 +55,10 @@ class _HomeSwitcher extends StatelessWidget {
         for (final invite in app.homes.invites)
           _ActionRow(
             icon: CupertinoIcons.envelope,
-            label: l10n.inviteFrom(invite.invitedBy, invite.homeName),
+            label: l10n.inviteFrom(
+              invite.invitedBy ?? l10n.someone,
+              invite.homeName,
+            ),
             onTap: () => Navigator.of(context).pop<WidgetBuilder>(
               (_) => InviteAcceptScreen(inviteId: invite.id),
             ),
@@ -97,9 +100,8 @@ class _HomeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final l10n = context.l10n;
-    final devices = home.connected
-        ? context.app.lighting.devices.length + 1
-        : home.previewDeviceCount;
+    final app = context.app;
+    final devices = app.homes.deviceCount(home, app.lighting);
     final summary = home.invitedBy != null
         ? l10n.memberInvitedBy(l10n.role(home.role.name), home.invitedBy!)
         : '${l10n.role(home.role.name)} · '

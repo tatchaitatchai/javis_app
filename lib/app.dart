@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'app_scope.dart';
+import 'backend/create_backend.dart';
+import 'backend/demo_backend.dart';
+import 'backend/javis_backend.dart';
 import 'core/localization/app_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/launch_experience.dart';
@@ -19,11 +22,13 @@ class JavisApp extends StatefulWidget {
   const JavisApp({
     super.key,
     this.lightingService,
+    this.backend,
     this.themeMode = ThemeMode.system,
     this.showSplash = true,
     this.startSignedIn = false,
   });
   final LightingService? lightingService;
+  final JavisBackend? backend;
   final ThemeMode themeMode;
   final bool showSplash;
 
@@ -37,23 +42,46 @@ class _JavisAppState extends State<JavisApp> with WidgetsBindingObserver {
   Locale? _locale;
   late final LightingService _service =
       widget.lightingService ?? createLightingService();
-  final _account = AccountStore();
-  final _homes = HomeStore();
+  late final JavisBackend _backend = widget.backend ?? createBackend();
+  late final _account = AccountStore(_backend);
+  late final _homes = HomeStore(_backend);
+  late final _scenes = SceneStore(_backend);
   final _lock = LockStore();
-  final _scenes = SceneStore();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_service.initialize());
-    if (widget.startSignedIn) {
-      _account.signInDemo();
-      _homes.loadDemoAccount(
-        yourName: _account.name,
-        yourPhone: _account.phone!,
-      );
-    }
+    _account.onSignedOut = () {
+      _homes.reset();
+      _scenes.reset();
+    };
+    if (widget.startSignedIn) _openDemoAccount();
+    _homes.addListener(_onHomesChanged);
+    _service.addListener(_claimNewLights);
+  }
+
+  void _openDemoAccount() {
+    final demo = _backend as DemoBackend;
+    _account.signInDemo();
+    _homes.adopt(demo.demoAccount());
+    _scenes.adopt(_homes.activeHome!.id, demo.scenes);
+  }
+
+  void _onHomesChanged() {
+    unawaited(_scenes.show(_homes.activeHome?.id));
+    _claimNewLights();
+  }
+
+  void _claimNewLights() => unawaited(_homes.claimNewLights(_service));
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || _backend.isDemo) return;
+    if (!_account.signedIn) return;
+    unawaited(_homes.refresh());
+    unawaited(_scenes.reload());
   }
 
   @override
@@ -64,6 +92,8 @@ class _JavisAppState extends State<JavisApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _homes.removeListener(_onHomesChanged);
+    _service.removeListener(_claimNewLights);
     if (widget.lightingService == null) _service.dispose();
     _account.dispose();
     _homes.dispose();

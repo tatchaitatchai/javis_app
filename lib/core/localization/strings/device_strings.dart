@@ -4,7 +4,7 @@ part of '../app_localizations.dart';
 extension DeviceStrings on AppLocalizations {
   String get online => _t('Online', 'ออนไลน์');
   String get notResponding => _t('Not responding', 'ไม่ตอบสนอง');
-  String powerOf(String name) => _t('$name power', 'เปิดปิด$name');
+  String powerOf(String name) => _t('$name power', 'เปิดปิด $name');
   String temperatureFeel(int kelvin) => kelvin < 3500
       ? _t('Warm', 'โทนอุ่น')
       : kelvin < 5000
@@ -77,7 +77,7 @@ extension DeviceStrings on AppLocalizations {
   };
 
   String get whatToAdd => _t('What are you adding?', 'เพิ่มอุปกรณ์อะไร');
-  String addingTo(String home) => _t('Adding to $home', 'จะเพิ่มเข้า$home');
+  String addingTo(String home) => _t('Adding to $home', 'จะเพิ่มเข้า $home');
   String get deviceTypeBulb => _t('Light bulb', 'หลอดไฟ');
   String get deviceTypeLock => _t('Door lock', 'กลอนประตู');
   String get deviceTypeProtocol =>
@@ -100,7 +100,7 @@ extension DeviceStrings on AppLocalizations {
       _t('Send home Wi-Fi to the bulb', 'ส่ง Wi-Fi บ้านให้หลอด');
   String get stepWaitOnline =>
       _t('Wait for the bulb to come online', 'รอหลอดออนไลน์');
-  String stepAddToHome(String home) => _t('Add to $home', 'เพิ่มเข้า$home');
+  String stepAddToHome(String home) => _t('Add to $home', 'เพิ่มเข้า $home');
   String get band24 => _t('2.4 GHz', '2.4 GHz');
   String get wifi24Only => _t(
     'Bulbs only join 2.4 GHz Wi-Fi. A 5 GHz-only network won’t work.',

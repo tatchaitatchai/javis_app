@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app_scope.dart';
@@ -6,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/ambient_widgets.dart';
 import '../../core/widgets/calm_buttons.dart';
 import '../../core/widgets/calm_segment.dart';
+import '../../core/widgets/failure_message.dart';
 import '../../core/widgets/flow_page.dart';
 import 'light_controls.dart';
 import 'light_labels.dart';
@@ -113,7 +116,14 @@ class _LightDetailScreenState extends State<LightDetailScreen>
               device: light,
               controlsBusy: _pending || powerPending,
               onRemoved: () {
-                if (mounted) Navigator.of(context).pop();
+                if (!mounted) return;
+                unawaited(
+                  attempt(
+                    context,
+                    () => app.homes.forgetDevice(app.lighting, light.id),
+                  ),
+                );
+                Navigator.of(context).pop();
               },
             ),
           DemoNote(

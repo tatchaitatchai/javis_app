@@ -19,11 +19,13 @@ class LockScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lock = context.app.lock;
+    final homes = context.app.homes;
     final l10n = context.l10n;
     return ListenableBuilder(
-      listenable: lock,
+      listenable: Listenable.merge([lock, homes]),
       builder: (context, _) {
         final status = lock.status;
+        final canUnlock = homes.activeHome?.canUnlock ?? false;
         return FlowPage(
           top: FlowTopBar(
             leading: const CalmBackButton(),
@@ -44,7 +46,7 @@ class LockScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                l10n.lockPreviewNote,
+                canUnlock ? l10n.lockPreviewNote : l10n.noUnlockRight,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -55,7 +57,7 @@ class LockScreen extends StatelessWidget {
                     : l10n.unlockDoor,
                 icon: CupertinoIcons.lock_open,
                 loading: status == LockStatus.unlocking,
-                onPressed: status == LockStatus.locked
+                onPressed: status == LockStatus.locked && canUnlock
                     ? () => showUnlockSheet(context)
                     : null,
               ),

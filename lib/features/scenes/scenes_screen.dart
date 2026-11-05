@@ -6,8 +6,8 @@ import '../../core/localization/app_localizations.dart';
 import '../../core/motion/entrance.dart';
 import '../../core/motion/motion.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/widgets/ambient_widgets.dart';
 import '../../core/widgets/calm_buttons.dart';
+import '../../core/widgets/calm_surfaces.dart';
 import '../../core/widgets/pressable.dart';
 import 'scene_editor_screen.dart';
 import 'scene_labels.dart';
@@ -83,7 +83,20 @@ class ScenesScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                  if (!app.lighting.isDemo) DemoNote(text: l10n.demoScenesOnly),
+                  if (app.scenes.loadFailed)
+                    CalmPanel(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(l10n.cantLoadScenes),
+                          const SizedBox(height: 8),
+                          SecondaryButton(
+                            label: l10n.tryAgain,
+                            onPressed: app.scenes.reload,
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),

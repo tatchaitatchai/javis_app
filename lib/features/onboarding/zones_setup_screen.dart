@@ -4,6 +4,7 @@ import '../../app_scope.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/widgets/calm_buttons.dart';
 import '../../core/widgets/calm_surfaces.dart';
+import '../../core/widgets/failure_message.dart';
 import '../../core/widgets/flow_page.dart';
 import '../../core/widgets/step_bar.dart';
 import '../../core/widgets/tile_grid.dart';
@@ -30,6 +31,7 @@ class _ZonesSetupScreenState extends State<ZonesSetupScreen> {
   final _presets = <String>{...zonePresetKeys.take(4)};
   final _custom = <String>[];
   final _customSelected = <String>{};
+  bool _creating = false;
 
   int get _count => _presets.length + _customSelected.length;
 
@@ -52,21 +54,27 @@ class _ZonesSetupScreenState extends State<ZonesSetupScreen> {
     });
   }
 
-  void _finish() {
-    if (_count == 0) return;
-    final app = context.app;
-    app.homes.createHome(
-      name: widget.homeName,
-      presetKeys: [
-        for (final key in zonePresetKeys)
-          if (_presets.contains(key)) key,
-      ],
-      customZones: [
-        for (final name in _custom)
-          if (_customSelected.contains(name)) name,
-      ],
-      owner: app.account.asMember,
+  Future<void> _finish() async {
+    if (_count == 0 || _creating) return;
+    setState(() => _creating = true);
+    final homes = context.app.homes;
+    final created = await attempt(
+      context,
+      () => homes.createHome(
+        name: widget.homeName,
+        presetKeys: [
+          for (final key in zonePresetKeys)
+            if (_presets.contains(key)) key,
+        ],
+        customZones: [
+          for (final name in _custom)
+            if (_customSelected.contains(name)) name,
+        ],
+      ),
     );
+    if (!mounted) return;
+    setState(() => _creating = false);
+    if (!created) return;
     if (widget.addingAnother) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
@@ -89,6 +97,7 @@ class _ZonesSetupScreenState extends State<ZonesSetupScreen> {
             ),
       footer: PrimaryButton(
         label: l10n.enterHomeWithZones(_count),
+        loading: _creating,
         onPressed: _count == 0 ? null : _finish,
       ),
       children: [

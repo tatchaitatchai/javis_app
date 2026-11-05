@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../backend/backend_failure.dart';
+import '../../backend/javis_backend.dart';
 import '../home/home_store.dart';
 import '../lighting/lighting_service.dart';
 import 'scene_models.dart';
@@ -11,94 +13,94 @@ class SceneRunResult {
   final int failed;
 }
 
-/// Mock scene list (spec 012). Running a scene sends ordinary light commands
-/// through [LightingService] and is offered for demo lights only, as before.
+/// The active home's scenes. Running one sends ordinary light commands through
+/// [LightingService], then records the run.
 class SceneStore extends ChangeNotifier {
-  SceneStore({DateTime Function()? clock}) : _clock = clock ?? DateTime.now {
-    final now = _clock();
-    _scenes = [
-      Scene(
-        id: 'scene-sleep',
-        presetKey: 'Sleep',
-        icon: SceneIcon.moon,
-        lastRun: DateTime(now.year, now.month, now.day - 1, 23, 10),
-        actions: const [
-          LightAction(
-            target: LightTarget.device('bedside-lamp'),
-            isOn: true,
-            brightness: .1,
-            temperature: 2700,
-          ),
-          LightAction(target: LightTarget.others(), isOn: false),
-          LockCheckAction(),
-        ],
-      ),
-      const Scene(
-        id: 'scene-home',
-        presetKey: 'Welcome home',
-        icon: SceneIcon.home,
-        actions: [
-          LightAction(
-            target: LightTarget.zone('Living room'),
-            isOn: true,
-            brightness: .8,
-            temperature: 3000,
-          ),
-          LightAction(target: LightTarget.zone('Front yard'), isOn: true),
-        ],
-      ),
-      const Scene(
-        id: 'scene-leave',
-        presetKey: 'Leave home',
-        icon: SceneIcon.leave,
-        actions: [
-          LightAction(target: LightTarget.all(), isOn: false),
-          LockCheckAction(),
-        ],
-      ),
-      const Scene(
-        id: 'scene-wake',
-        presetKey: 'Wake up',
-        icon: SceneIcon.sunrise,
-        actions: [
-          LightAction(
-            target: LightTarget.zone('Bedroom'),
-            isOn: true,
-            brightness: .6,
-            temperature: 4500,
-          ),
-        ],
-      ),
-    ];
-  }
+  SceneStore(this._backend);
 
-  final DateTime Function() _clock;
-  late List<Scene> _scenes;
+  final JavisBackend _backend;
+  List<Scene> _scenes = const [];
+  String? _homeId;
   String? _running;
+  bool _loadFailed = false;
   int _nextId = 0;
 
   List<Scene> get scenes => List.unmodifiable(_scenes);
   String? get runningId => _running;
+  bool get loadFailed => _loadFailed;
   Scene? byId(String id) =>
       _scenes.where((scene) => scene.id == id).firstOrNull;
 
-  bool canRun(LightingService lighting) => lighting.isDemo && _running == null;
+  bool get canRun => _running == null;
+
+  /// Uses scenes that are already at hand.
+  void adopt(String homeId, List<Scene> scenes) {
+    _homeId = homeId;
+    _scenes = scenes;
+    notifyListeners();
+  }
+
+  void reset() {
+    _homeId = null;
+    _scenes = const [];
+    _loadFailed = false;
+    notifyListeners();
+  }
+
+  /// Shows the scenes of [homeId]. Does nothing if they are already showing.
+  Future<void> show(String? homeId) async {
+    if (homeId == _homeId) return;
+    if (homeId == null) return reset();
+    _homeId = homeId;
+    _scenes = const [];
+    await reload();
+  }
+
+  Future<void> reload() async {
+    final homeId = _homeId;
+    if (homeId == null) return;
+    _loadFailed = false;
+    notifyListeners();
+    try {
+      final scenes = await _backend.loadScenes(homeId);
+      if (homeId != _homeId) return; // The home changed while this was loading.
+      _scenes = scenes;
+    } on BackendFailure {
+      if (homeId != _homeId) return;
+      _scenes = const [];
+      _loadFailed = true;
+    }
+    notifyListeners();
+  }
 
   Scene draft() => Scene(
-    id: 'scene-new-${_nextId++}',
+    id: '$_draftPrefix${_nextId++}',
     icon: SceneIcon.sparkle,
     actions: const [],
   );
 
-  void save(Scene scene) {
-    final exists = _scenes.any((item) => item.id == scene.id);
-    _scenes = exists
-        ? [for (final item in _scenes) item.id == scene.id ? scene : item]
-        : [..._scenes, scene];
+  static const _draftPrefix = 'scene-new-';
+
+  /// Throws `BackendFailure`; the editor stays open with the draft intact.
+  Future<void> save(Scene scene) async {
+    final homeId = _homeId;
+    if (homeId == null) return;
+    if (scene.id.startsWith(_draftPrefix)) {
+      final saved = await _backend.createScene(homeId, scene);
+      _scenes = [..._scenes, saved];
+    } else {
+      final saved = await _backend.updateScene(homeId, scene);
+      _scenes = [
+        for (final item in _scenes) item.id == saved.id ? saved : item,
+      ];
+    }
     notifyListeners();
   }
 
-  void delete(String id) {
+  Future<void> delete(String id) async {
+    final homeId = _homeId;
+    if (homeId == null) return;
+    await _backend.deleteScene(homeId, id);
     _scenes = _scenes.where((scene) => scene.id != id).toList();
     notifyListeners();
   }
@@ -108,22 +110,16 @@ class SceneStore extends ChangeNotifier {
     required LightingService lighting,
     required HomeStore homes,
   }) async {
-    if (!canRun(lighting)) {
-      return const SceneRunResult(applied: 0, failed: 0);
-    }
+    if (!canRun) return const SceneRunResult(applied: 0, failed: 0);
     _running = scene.id;
     notifyListeners();
     var applied = 0;
     var failed = 0;
     final touched = <String>{};
+    final lights = homes.lightsIn(lighting);
     try {
       for (final action in scene.actions.whereType<LightAction>()) {
-        for (final device in _targets(
-          action.target,
-          lighting,
-          homes,
-          touched,
-        )) {
+        for (final device in _targets(action.target, lights, homes, touched)) {
           touched.add(device.id);
           final command = _command(action, device.capabilities);
           if (!device.online || command == null) continue;
@@ -135,10 +131,7 @@ class SceneStore extends ChangeNotifier {
           }
         }
       }
-      _scenes = [
-        for (final item in _scenes)
-          item.id == scene.id ? item.copyWith(lastRun: _clock()) : item,
-      ];
+      await _recordRun(scene);
     } finally {
       _running = null;
       notifyListeners();
@@ -146,12 +139,29 @@ class SceneStore extends ChangeNotifier {
     return SceneRunResult(applied: applied, failed: failed);
   }
 
+  /// The lights have already changed, so a failure here only leaves the
+  /// server's last-run time behind. It does not fail the scene.
+  Future<void> _recordRun(Scene scene) async {
+    final homeId = _homeId;
+    if (homeId == null) return;
+    var lastRun = DateTime.now();
+    try {
+      lastRun = await _backend.recordSceneRun(homeId, scene.id);
+    } on BackendFailure catch (failure) {
+      debugPrint('Recording a scene run failed: ${failure.code}');
+    }
+    _scenes = [
+      for (final item in _scenes)
+        item.id == scene.id ? item.copyWith(lastRun: lastRun) : item,
+    ];
+  }
+
   Iterable<LightDevice> _targets(
     LightTarget target,
-    LightingService lighting,
+    List<LightDevice> lights,
     HomeStore homes,
     Set<String> touched,
-  ) => lighting.devices.where(
+  ) => lights.where(
     (device) => switch (target.kind) {
       LightTargetKind.device => device.id == target.key,
       LightTargetKind.zone => _zoneKey(device, homes) == target.key,

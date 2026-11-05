@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:javis_app/app.dart';
 import 'package:javis_app/app_scope.dart';
+import 'package:javis_app/backend/demo_backend.dart';
 import 'package:javis_app/core/localization/app_localizations.dart';
 import 'package:javis_app/core/widgets/calm_buttons.dart';
 import 'package:javis_app/features/account/account_store.dart';
@@ -1431,15 +1432,15 @@ Future<void> _openBulbPairing(WidgetTester tester) async {
 
 /// Detail screens read their services from [AppScope].
 Widget _scoped(LightingService service, Widget child) {
-  final homes = HomeStore();
-  final account = AccountStore()..signInDemo();
-  homes.loadDemoAccount(yourName: account.name, yourPhone: account.phone!);
+  final backend = DemoBackend();
+  final homes = HomeStore(backend)..adopt(backend.demoAccount());
+  final account = AccountStore(backend)..signInDemo();
   return AppScope(
     lighting: service,
     account: account,
     homes: homes,
     lock: LockStore(),
-    scenes: SceneStore(),
+    scenes: SceneStore(backend)..adopt(homes.activeHome!.id, backend.scenes),
     child: child,
   );
 }

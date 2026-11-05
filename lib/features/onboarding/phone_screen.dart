@@ -5,6 +5,7 @@ import '../../app_scope.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/widgets/calm_buttons.dart';
 import '../../core/widgets/calm_surfaces.dart';
+import '../../core/widgets/failure_message.dart';
 import '../../core/widgets/flow_page.dart';
 import '../account/account_store.dart';
 import '../account/phone_field.dart';
@@ -34,9 +35,13 @@ class _PhoneScreenState extends State<PhoneScreen> {
     final digits = _digits;
     if (digits == null || _sending) return;
     setState(() => _sending = true);
-    await context.app.account.requestCode(digits);
+    final sent = await attempt(
+      context,
+      () => context.app.account.requestCode(digits),
+    );
     if (!mounted) return;
     setState(() => _sending = false);
+    if (!sent) return;
     await Navigator.of(context)
         .push(CupertinoPageRoute<void>(builder: (_) => const OtpScreen()));
   }

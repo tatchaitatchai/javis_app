@@ -16,18 +16,12 @@ IconData sceneIcon(SceneIcon icon) => switch (icon) {
   SceneIcon.sparkle => CupertinoIcons.sparkles,
 };
 
-/// Runs a scene with feedback. Scenes stay demo-only, as in spec 001.
+/// Runs a scene with feedback. Lights without a capability are skipped.
 Future<void> runScene(BuildContext context, Scene scene) async {
   final app = context.app;
   final messenger = ScaffoldMessenger.maybeOf(context);
   final l10n = context.l10n;
-  if (!app.lighting.isDemo) {
-    messenger
-      ?..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(l10n.demoScenesOnly)));
-    return;
-  }
-  if (!app.scenes.canRun(app.lighting)) return;
+  if (!app.scenes.canRun) return;
   Haptics.confirm();
   final result = await app.scenes.run(
     scene,

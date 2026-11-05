@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_scope.dart';
+import '../../backend/backend_failure.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/motion/motion.dart';
 import '../../core/theme/app_theme.dart';
@@ -14,8 +15,9 @@ import '../account/account_store.dart';
 import '../account/phone_field.dart';
 import 'home_models.dart';
 
-/// 23 · Invite someone to the active home by mobile number. Preview only:
-/// the invite is kept on this device and no SMS is sent (spec 012).
+/// 23 · Invite someone to the active home by mobile number. No SMS is sent:
+/// they see the invitation when they sign in with that number. The admin role
+/// and the unlock right are the owner's to give.
 class MembersScreen extends StatefulWidget {
   const MembersScreen({super.key});
 
@@ -27,16 +29,10 @@ class _MembersScreenState extends State<MembersScreen> {
   final _phone = TextEditingController();
   HomeRole _role = HomeRole.member;
   bool _canUnlock = false;
+  bool _sending = false;
+  String? _error;
 
   String? get _digits => normalizeThaiMobile(_phone.text);
-
-  bool get _alreadyMember {
-    final digits = _digits;
-    final home = context.app.homes.activeHome;
-    return digits != null &&
-        home != null &&
-        home.members.any((member) => member.phone == digits);
-  }
 
   @override
   void dispose() {
@@ -44,27 +40,43 @@ class _MembersScreenState extends State<MembersScreen> {
     super.dispose();
   }
 
-  void _send() {
+  Future<void> _send() async {
     final digits = _digits;
-    if (digits == null || _alreadyMember) return;
-    context.app.homes.inviteMember(
-      phone: digits,
-      role: _role,
-      canUnlock: _canUnlock,
-    );
-    Haptics.confirm();
+    if (digits == null || _sending) return;
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
     final l10n = context.l10n;
-    ScaffoldMessenger.of(context)
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await context.app.homes.inviteMember(
+        phone: digits,
+        role: _role,
+        canUnlock: _canUnlock,
+      );
+    } on BackendFailure catch (failure) {
+      Haptics.warn();
+      if (mounted) {
+        setState(() {
+          _sending = false;
+          _error = l10n.failure(failure);
+        });
+      }
+      return;
+    }
+    Haptics.confirm();
+    messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(l10n.inviteSaved)));
-    Navigator.of(context).pop();
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final home = context.app.homes.activeHome;
-    final duplicate = _alreadyMember;
+    final isOwner = home?.isOwner ?? false;
     return FlowPage(
       top: const FlowTopBar(leading: CalmBackButton()),
       footer: Column(
@@ -78,7 +90,8 @@ class _MembersScreenState extends State<MembersScreen> {
           const SizedBox(height: 12),
           PrimaryButton(
             label: l10n.sendInvite,
-            onPressed: _digits == null || duplicate ? null : _send,
+            loading: _sending,
+            onPressed: _digits == null ? null : _send,
           ),
         ],
       ),
@@ -92,44 +105,46 @@ class _MembersScreenState extends State<MembersScreen> {
         ThaiPhoneField(
           label: l10n.mobileNumber,
           controller: _phone,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() => _error = null),
         ),
-        if (duplicate) ...[
+        if (_error != null) ...[
           const SizedBox(height: 8),
           Semantics(
             liveRegion: true,
             child: Text(
-              l10n.alreadyMember,
+              _error!,
               style: TextStyle(color: context.palette.danger, fontSize: 13.5),
             ),
           ),
         ],
-        SectionHeader(l10n.yourRoleLabel),
-        for (final role in [HomeRole.admin, HomeRole.member])
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _RoleOption(
-              title: l10n.role(role.name),
-              description: l10n.roleDescription(role.name),
-              selected: _role == role,
-              onTap: () => setState(() => _role = role),
-            ),
-          ),
-        const SizedBox(height: 8),
-        ListGroup(
-          children: [
-            ListRow(
-              title: l10n.allowUnlock,
-              subtitle: l10n.allowUnlockHint,
-              onTap: () => setState(() => _canUnlock = !_canUnlock),
-              trailing: CalmSwitch(
-                value: _canUnlock,
-                semanticLabel: l10n.allowUnlock,
-                onChanged: (value) => setState(() => _canUnlock = value),
+        if (isOwner) ...[
+          SectionHeader(l10n.yourRoleLabel),
+          for (final role in [HomeRole.admin, HomeRole.member])
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _RoleOption(
+                title: l10n.role(role.name),
+                description: l10n.roleDescription(role.name),
+                selected: _role == role,
+                onTap: () => setState(() => _role = role),
               ),
             ),
-          ],
-        ),
+          const SizedBox(height: 8),
+          ListGroup(
+            children: [
+              ListRow(
+                title: l10n.allowUnlock,
+                subtitle: l10n.allowUnlockHint,
+                onTap: () => setState(() => _canUnlock = !_canUnlock),
+                trailing: CalmSwitch(
+                  value: _canUnlock,
+                  semanticLabel: l10n.allowUnlock,
+                  onChanged: (value) => setState(() => _canUnlock = value),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

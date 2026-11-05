@@ -4,6 +4,7 @@ import UIKit
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var lightingBridge: JavisLightingBridge?
+  private var sessionVault: SessionVaultBridge?
 
   override func application(
     _ application: UIApplication,
@@ -21,6 +22,10 @@ import UIKit
     )
     bridge.register()
     lightingBridge = bridge
+
+    let vault = SessionVaultBridge(messenger: engineBridge.applicationRegistrar.messenger())
+    vault.register()
+    sessionVault = vault
   }
 }
 

@@ -22,7 +22,8 @@ void main() {
     await _settleNetwork(tester);
     expect(find.text('That code didn’t match. Try again.'), findsOneWidget);
 
-    await tester.enterText(find.byKey(const ValueKey('otp-field')), '123456');
+    // The keyboard stays attached: the next digits arrive without a tap.
+    tester.testTextInput.enterText('123456');
     await _settleNetwork(tester);
     expect(find.text('บ้านลาดพร้าว'), findsOneWidget);
     expect(find.text('Ceiling light'), findsOneWidget);
@@ -177,6 +178,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Removing a member asks first', (tester) async {
+    await _signedIn(tester, MockLightingService());
+    await tester.tap(find.bySemanticsLabel('บ้านลาดพร้าว, switch home'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings for บ้านลาดพร้าว'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('ต้น'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ต้น'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Remove from home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove ต้น from this home?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove from home'), findsOneWidget);
+    expect(find.text('Members · 3'), findsOneWidget);
+
+    await tester.tap(find.text('Remove from home'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove from home').last);
+    await tester.pumpAndSettle();
+    expect(find.text('ต้น'), findsNothing);
+    expect(find.text('Members · 2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Members can be invited and signing out returns to welcome', (
     tester,
   ) async {
@@ -244,6 +273,8 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(find.text('Ceiling light'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Ceiling light'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(

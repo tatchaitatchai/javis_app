@@ -69,7 +69,7 @@ class _ZoneScreenState extends State<ZoneScreen> {
               );
             }
             final lights = [
-              for (final light in app.lighting.devices)
+              for (final light in app.homes.lightsIn(app.lighting))
                 if (app.homes.zoneIdFor(light) == zone.id) light,
             ];
             final on = lights

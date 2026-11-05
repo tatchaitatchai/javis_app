@@ -9,6 +9,7 @@ import '../../core/widgets/calm_buttons.dart';
 import '../../core/widgets/calm_segment.dart';
 import '../../core/widgets/calm_surfaces.dart';
 import '../../core/widgets/calm_switch.dart';
+import '../../core/widgets/failure_message.dart';
 import '../home/home_switcher_sheet.dart';
 import '../home/zone_name_sheet.dart';
 import 'account_store.dart';
@@ -33,7 +34,9 @@ class _MeScreenState extends State<MeScreen> {
       label: l10n.nickname,
       initial: context.app.account.name,
     );
-    if (name != null && mounted) context.app.account.setName(name);
+    if (name == null || !mounted) return;
+    final account = context.app.account;
+    await attempt(context, () => account.setName(name));
   }
 
   Future<void> _signOut() async {
@@ -56,10 +59,8 @@ class _MeScreenState extends State<MeScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    final app = context.app;
     Haptics.warn();
-    app.account.signOut();
-    app.homes.reset();
+    await context.app.account.signOut();
   }
 
   @override

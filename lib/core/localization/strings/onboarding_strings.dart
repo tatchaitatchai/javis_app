@@ -83,7 +83,7 @@ extension OnboardingStrings on AppLocalizations {
   );
 
   String zonesTitle(String home) =>
-      _t('Which zones does $home have?', '$homeมีโซนอะไรบ้าง');
+      _t('Which zones does $home have?', '$home มีโซนอะไรบ้าง');
   String get zonesSubtitle => _t(
     'Pick as many as you like. You can always change them later.',
     'เลือกได้หลายโซน แก้ไขหรือเพิ่มทีหลังได้เสมอ',

@@ -13,7 +13,22 @@ flutter run -d <ios-simulator-id>
 
 Xcode and an installed iOS Simulator runtime are required. A physical iPhone
 also needs a development team/signing configuration in Xcode. No API,
-database, or Tuya credentials are needed for this prototype.
+database, or Tuya credentials are needed for the demo build.
+
+To use the real API, start it in OTP debug mode (see `../javis_api/README.md`)
+and pass its address. Without this define the app stays on local demo data:
+
+```text
+flutter run -d <ios-simulator-id> --dart-define=JAVIS_API_URL=http://127.0.0.1:8081
+```
+
+A physical iPhone cannot reach `127.0.0.1`; use the Mac's LAN address.
+
+The live household test writes data, so point it at a throwaway database:
+
+```text
+flutter test test/backend/live_api_test.dart --dart-define=JAVIS_LIVE_API_URL=http://127.0.0.1:8082
+```
 
 To run the unavailable-state Tuya foundation on a connected physical iPhone:
 

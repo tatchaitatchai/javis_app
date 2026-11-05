@@ -79,6 +79,15 @@ class Scene {
     lastRun: lastRun ?? this.lastRun,
   );
 
+  Scene withId(String id) => Scene(
+    id: id,
+    icon: icon,
+    actions: actions,
+    presetKey: presetKey,
+    customName: customName,
+    lastRun: lastRun,
+  );
+
   /// Zones this scene changes, for “scenes in this room”.
   bool touchesZone(String presetKey) => actions.any(
     (action) =>

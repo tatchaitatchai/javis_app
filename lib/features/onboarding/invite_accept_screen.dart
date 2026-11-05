@@ -7,28 +7,59 @@ import '../../core/motion/motion.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/calm_buttons.dart';
 import '../../core/widgets/calm_surfaces.dart';
+import '../../core/widgets/failure_message.dart';
 import '../../core/widgets/flow_page.dart';
 import '../account/account_store.dart';
 import '../shell/app_root.dart';
 
 /// 08 · Accept an invitation to someone else's home.
-class InviteAcceptScreen extends StatelessWidget {
+class InviteAcceptScreen extends StatefulWidget {
   const InviteAcceptScreen({required this.inviteId, super.key});
   final String inviteId;
 
-  void _leave(BuildContext context) {
-    if (context.app.account.stage == AccountStage.onboarding) {
+  @override
+  State<InviteAcceptScreen> createState() => _InviteAcceptScreenState();
+}
+
+class _InviteAcceptScreenState extends State<InviteAcceptScreen> {
+  bool _joining = false;
+  bool _declining = false;
+
+  Future<void> _join() async {
+    setState(() => _joining = true);
+    final app = context.app;
+    final joined = await attempt(
+      context,
+      () => app.homes.acceptInvite(widget.inviteId),
+    );
+    if (!mounted) return;
+    setState(() => _joining = false);
+    if (!joined) return;
+    Haptics.confirm();
+    if (app.account.stage == AccountStage.onboarding) {
       enterHome(context);
     } else {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 
+  Future<void> _decline() async {
+    setState(() => _declining = true);
+    final homes = context.app.homes;
+    final declined = await attempt(
+      context,
+      () => homes.declineInvite(widget.inviteId),
+    );
+    if (!mounted) return;
+    setState(() => _declining = false);
+    if (declined) await Navigator.of(context).maybePop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.app;
     final invite = app.homes.invites
-        .where((item) => item.id == inviteId)
+        .where((item) => item.id == widget.inviteId)
         .firstOrNull;
     final l10n = context.l10n;
     final palette = context.palette;
@@ -51,20 +82,14 @@ class InviteAcceptScreen extends StatelessWidget {
         children: [
           PrimaryButton(
             label: l10n.joinHome,
-            onPressed: () {
-              Haptics.confirm();
-              app.homes.acceptInvite(invite.id, app.account.asMember);
-              _leave(context);
-            },
+            loading: _joining,
+            onPressed: _declining ? null : _join,
           ),
           const SizedBox(height: 4),
           QuietButton(
             label: l10n.decline,
             accent: false,
-            onPressed: () {
-              app.homes.declineInvite(invite.id);
-              Navigator.of(context).maybePop();
-            },
+            onPressed: _joining || _declining ? null : _decline,
           ),
         ],
       ),
@@ -87,7 +112,7 @@ class InviteAcceptScreen extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         Text(
-          l10n.invitedYou(invite.invitedBy),
+          l10n.invitedYou(invite.invitedBy ?? l10n.someone),
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 15, color: palette.textMuted),
         ),
@@ -102,10 +127,9 @@ class InviteAcceptScreen extends StatelessWidget {
             ListRow(title: l10n.yourRole, value: l10n.role(invite.role.name)),
             ListRow(
               title: l10n.inThisHome,
-              value: l10n.zonesAndDevices(
-                invite.zoneKeys.length,
-                invite.deviceCount,
-              ),
+              value: invite.deviceCount == null
+                  ? l10n.zoneTotal(invite.zoneCount)
+                  : l10n.zonesAndDevices(invite.zoneCount, invite.deviceCount!),
             ),
             ListRow(
               title: l10n.inviteExpires,

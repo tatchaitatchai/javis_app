@@ -18,6 +18,7 @@ import '../pairing/device_type_screen.dart';
 import '../scenes/scene_strip.dart';
 import '../voice/voice_screen.dart';
 import 'home_models.dart';
+import 'home_status_view.dart';
 import 'home_switcher_sheet.dart';
 import 'zone_screen.dart';
 
@@ -40,7 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       listenable: Listenable.merge([app.homes, app.lighting]),
       builder: (context, _) {
         final home = app.homes.activeHome;
-        if (home == null) return const SizedBox.shrink();
+        if (home == null) return const HomeStatusView();
         final zone = home.zones
             .where((zone) => zone.id == _zoneFilter)
             .firstOrNull;
@@ -155,9 +156,9 @@ class _Summary extends StatelessWidget {
     final l10n = context.l10n;
     return ListenableBuilder(
       // Listens itself: as a const child it is not rebuilt by its parent.
-      listenable: Listenable.merge([app.lighting, app.lock]),
+      listenable: Listenable.merge([app.lighting, app.lock, app.homes]),
       builder: (context, _) {
-        final lights = app.lighting.devices;
+        final lights = app.homes.lightsIn(app.lighting);
         final unknown = lights.any((light) => !light.capabilities.power);
         final on = lights
             .where(
@@ -189,16 +190,20 @@ class _SceneRow extends StatelessWidget {
     final scenes = context.app.scenes;
     return ListenableBuilder(
       listenable: scenes,
-      builder: (context, _) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        child: Row(
-          children: [
-            for (final scene in scenes.scenes.take(4)) ...[
-              ScenePill(scene: scene),
-              const SizedBox(width: 8),
+      // Keeps its height while a home's scenes load, so the page does not jump.
+      builder: (context, _) => ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
+          child: Row(
+            children: [
+              for (final scene in scenes.scenes.take(4)) ...[
+                ScenePill(scene: scene),
+                const SizedBox(width: 8),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -269,7 +274,7 @@ class _DeviceGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.app;
     final lights = [
-      for (final light in app.lighting.devices)
+      for (final light in app.homes.lightsIn(app.lighting))
         if (zone == null || app.homes.zoneIdFor(light) == zone!.id) light,
     ];
     if (lights.isEmpty) return _EmptyLights(zone: zone);

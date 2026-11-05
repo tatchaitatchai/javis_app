@@ -7,9 +7,11 @@ import '../../core/motion/motion.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/calm_buttons.dart';
 import '../../core/widgets/calm_surfaces.dart';
+import '../../core/widgets/failure_message.dart';
 import '../../core/widgets/flow_page.dart';
 import '../account/account_store.dart';
 import 'home_models.dart';
+import 'member_sheet.dart';
 import 'members_screen.dart';
 import 'zone_name_sheet.dart';
 
@@ -44,13 +46,17 @@ class _HomeSettings extends StatelessWidget {
       initial: home.name,
     );
     if (name != null && context.mounted) {
-      context.app.homes.renameActiveHome(name);
+      final homes = context.app.homes;
+      await attempt(context, () => homes.renameActiveHome(name));
     }
   }
 
   Future<void> _addZone(BuildContext context) async {
     final name = await showZoneNameSheet(context);
-    if (name != null && context.mounted) context.app.homes.addZone(name);
+    if (name != null && context.mounted) {
+      final homes = context.app.homes;
+      await attempt(context, () => homes.addZone(name));
+    }
   }
 
   Future<void> _delete(BuildContext context) async {
@@ -74,17 +80,52 @@ class _HomeSettings extends StatelessWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
+    final homes = context.app.homes;
+    final deleted = await attempt(context, homes.deleteActiveHome);
+    if (!deleted || !context.mounted) return;
     Haptics.warn();
     Navigator.of(context).pop();
-    context.app.homes.deleteActiveHome();
+  }
+
+  Future<void> _leave(BuildContext context) async {
+    final l10n = context.l10n;
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text(l10n.leaveHomeQuestion(home.name)),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.leaveHome),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final homes = context.app.homes;
+    final left = await attempt(context, homes.leaveActiveHome);
+    if (!left || !context.mounted) return;
+    Haptics.warn();
+    Navigator.of(context).pop();
   }
 
   int _devicesIn(BuildContext context, Zone zone) {
     final app = context.app;
-    if (!home.connected) return 0;
-    return app.lighting.devices
+    return app.homes
+        .lightsIn(app.lighting)
         .where((device) => app.homes.zoneIdFor(device) == zone.id)
         .length;
+  }
+
+  String _memberTitle(AppLocalizations l10n, Member member) {
+    if (member.pending) return maskThaiMobile(member.phone);
+    final name = member.name ?? l10n.unnamedMember;
+    return member.isYou ? l10n.youSuffix(name) : name;
   }
 
   @override
@@ -92,7 +133,8 @@ class _HomeSettings extends StatelessWidget {
     final l10n = context.l10n;
     final palette = context.palette;
     final manage = home.canManage;
-    final canDelete = context.app.homes.canDeleteActive();
+    final homes = context.app.homes;
+    final canDelete = homes.canDeleteActive();
     return FlowPage(
       top: FlowTopBar(
         leading: const CalmBackButton(),
@@ -106,6 +148,12 @@ class _HomeSettings extends StatelessWidget {
               label: l10n.deleteHome,
               destructive: true,
               onPressed: () => _delete(context),
+            )
+          : homes.canLeaveActive
+          ? SecondaryButton(
+              label: l10n.leaveHome,
+              destructive: true,
+              onPressed: () => _leave(context),
             )
           : null,
       children: [
@@ -161,12 +209,11 @@ class _HomeSettings extends StatelessWidget {
                   member.pending ? '' : member.name ?? '',
                   strong: member.isYou,
                 ),
-                title: member.pending || member.name == null
-                    ? maskThaiMobile(member.phone)
-                    : member.isYou
-                    ? l10n.youSuffix(member.name!)
-                    : member.name!,
+                title: _memberTitle(l10n, member),
                 subtitle: member.pending ? l10n.invitePending : null,
+                onTap: canOpenMemberSheet(context, member)
+                    ? () => showMemberSheet(context, member.id)
+                    : null,
                 trailing: StatusBadge(
                   l10n.role(member.role.name),
                   subtle: member.role == HomeRole.member,

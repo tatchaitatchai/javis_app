@@ -13,7 +13,7 @@ extension HomeStrings on AppLocalizations {
         );
   String get doorLocked => _t('Front door locked', 'ประตูหน้าล็อกอยู่');
   String get doorUnlocked => _t('Front door unlocked', 'ประตูหน้าไม่ได้ล็อก');
-  String openZone(String zone) => _t('Open $zone', 'เปิด$zone');
+  String openZone(String zone) => _t('Open $zone', 'เปิด $zone');
   String get noLightsYet => _t(
     'No lights in this home yet. Add one to get started.',
     'บ้านนี้ยังไม่มีหลอดไฟ เพิ่มหลอดแรกได้เลย',
@@ -33,9 +33,9 @@ extension HomeStrings on AppLocalizations {
   );
   String get myHomes => _t('My homes', 'บ้านของฉัน');
   String inviteFrom(String name, String home) =>
-      _t('$name invited you to $home', '$name ชวนคุณเข้า$home');
+      _t('$name invited you to $home', '$name ชวนคุณเข้า $home');
   String get addHome => _t('Add a home', 'เพิ่มบ้าน');
-  String settingsFor(String home) => _t('Settings for $home', 'ตั้งค่า$home');
+  String settingsFor(String home) => _t('Settings for $home', 'ตั้งค่า $home');
   String memberInvitedBy(String role, String name) =>
       _t('$role · invited by $name', '$role · $name เชิญ');
   String get editZones => _t('Edit zones', 'แก้ไขโซน');
@@ -44,7 +44,7 @@ extension HomeStrings on AppLocalizations {
   String get turnAllOff => _t('All off', 'ปิดทั้งหมด');
   String get scenesUsingZone => _t('Scenes in this zone', 'ฉากที่ใช้โซนนี้');
   String addDeviceTo(String zone) =>
-      _t('Add a device to $zone', 'เพิ่มอุปกรณ์ใน$zone');
+      _t('Add a device to $zone', 'เพิ่มอุปกรณ์ใน $zone');
 
   String get homeSettings => _t('Home settings', 'ตั้งค่าบ้าน');
   String get renameHome => _t('Rename home', 'เปลี่ยนชื่อบ้าน');
@@ -57,16 +57,16 @@ extension HomeStrings on AppLocalizations {
   String youSuffix(String name) => _t('$name (you)', '$name (คุณ)');
   String get invitePending => _t('Invitation pending', 'รอตอบรับคำเชิญ');
   String get deleteHome => _t('Delete this home', 'ลบบ้านนี้');
-  String deleteHomeQuestion(String home) => _t('Delete $home?', 'ลบ$home?');
+  String deleteHomeQuestion(String home) => _t('Delete $home?', 'ลบ $home?');
   String get deleteHomeBody => _t(
-    'Its zones and members are removed from this app.',
-    'โซนและสมาชิกของบ้านนี้จะถูกลบออกจากแอป',
+    'Its zones, members and scenes are removed for everyone.',
+    'โซน สมาชิก และฉากของบ้านนี้จะถูกลบสำหรับทุกคน',
   );
 
   String get inviteTitle => _t('Invite someone home', 'ชวนคนในบ้าน');
   String inviteSubtitle(String home) => _t(
     'Add them to $home with their mobile number.',
-    'เชิญเข้า$home ด้วยเบอร์มือถือ',
+    'เชิญเข้า $home ด้วยเบอร์มือถือ',
   );
   String get yourRoleLabel => _t('Role', 'บทบาท');
   String roleDescription(String key) => switch (key) {
@@ -91,8 +91,8 @@ extension HomeStrings on AppLocalizations {
   String get alreadyMember =>
       _t('This number is already in this home.', 'เบอร์นี้อยู่ในบ้านนี้แล้ว');
   String get inviteSaved => _t(
-    'Invitation added. This preview does not send an SMS.',
-    'เพิ่มคำเชิญแล้ว (ตัวอย่าง ยังไม่ได้ส่ง SMS จริง)',
+    'Invitation added. They’ll see it when they sign in.',
+    'เพิ่มคำเชิญแล้ว เขาจะเห็นเมื่อเข้าสู่ระบบ',
   );
 
   String get voiceTryExamples => _t(

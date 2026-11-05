@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../backend/backend_failure.dart';
 import '../theme/app_theme.dart';
 
+part 'strings/backend_strings.dart';
 part 'strings/common_strings.dart';
 part 'strings/onboarding_strings.dart';
 part 'strings/home_strings.dart';
@@ -441,10 +443,6 @@ class AppLocalizations {
     'ยังไม่มีหลอดไฟที่เชื่อมต่อในห้องนี้',
   );
   String get realRoomPreview => _t('Room layout preview', 'ตัวอย่างการจัดห้อง');
-  String get demoScenesOnly => _t(
-    'Scene presets are available in demo mode.',
-    'บรรยากาศสำเร็จรูปพร้อมใช้ในโหมดตัวอย่าง',
-  );
 
   String providerStatus(String state) => switch (state) {
     'initializing' => _t(

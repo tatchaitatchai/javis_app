@@ -9,7 +9,7 @@ extension SceneStrings on AppLocalizations {
     'Wake up' => _t('Wake up', 'ตื่นนอน'),
     _ => key,
   };
-  String sceneRan(String name) => _t('$name is on', 'เริ่ม$name แล้ว');
+  String sceneRan(String name) => _t('$name is on', 'เริ่ม $name แล้ว');
   String get scenesSubtitle => _t(
     'One tap sets several devices at once.',
     'แตะครั้งเดียว สั่งหลายอุปกรณ์พร้อมกัน',
@@ -19,7 +19,7 @@ extension SceneStrings on AppLocalizations {
   String editSceneNamed(String name) =>
       _t('Edit scene: $name', 'แก้ไขฉาก: $name');
   String get startSceneShort => _t('Start', 'เริ่ม');
-  String startScene(String name) => _t('Start $name', 'เริ่ม$name');
+  String startScene(String name) => _t('Start $name', 'เริ่ม $name');
   String actionCount(int count) =>
       _t('$count ${count == 1 ? 'action' : 'actions'}', '$count การทำงาน');
   String lastUsed(DateTime at, DateTime now) {
@@ -42,7 +42,7 @@ extension SceneStrings on AppLocalizations {
   String get whenSceneStarts =>
       _t('When this scene starts', 'เมื่อเริ่มฉากนี้');
   String get addAction => _t('Add action', 'เพิ่มการทำงาน');
-  String removeAction(String target) => _t('Remove $target', 'ลบ$target');
+  String removeAction(String target) => _t('Remove $target', 'ลบ $target');
   String get startSceneFrom => _t('Start this scene from', 'เริ่มฉากได้จาก');
   String get tapInApp => _t('Tap in the app', 'แตะในแอป');
   String sayPhrase(String name) => _t('Say “$name”', 'พูดว่า “$name”');
@@ -51,13 +51,13 @@ extension SceneStrings on AppLocalizations {
     'การเริ่มด้วยเสียงเป็นตัวอย่าง ยังใช้งานไม่ได้',
   );
   String get deleteScene => _t('Delete this scene', 'ลบฉากนี้');
-  String deleteSceneQuestion(String name) => _t('Delete $name?', 'ลบ$name?');
+  String deleteSceneQuestion(String name) => _t('Delete $name?', 'ลบ $name?');
   String get lightsSection => _t('Lights', 'ไฟ');
   String get allLights => _t('All lights', 'ไฟทุกดวง');
   String get otherLights => _t('All other lights', 'ไฟอื่นทั้งหมด');
   String get otherLightsHint =>
       _t('Lights this scene has not set yet', 'ไฟที่ฉากนี้ยังไม่ได้ตั้งค่า');
-  String targetOff(String target) => _t('$target off', 'ปิด$target');
+  String targetOff(String target) => _t('$target off', 'ปิด $target');
   String get lockCheckShort =>
       _t('Check the door is locked', 'เช็กว่าประตูล็อก');
   String get lockCheckDetail => _t(

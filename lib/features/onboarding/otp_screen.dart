@@ -6,14 +6,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app_scope.dart';
+import '../../backend/backend_failure.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/motion/motion.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/calm_buttons.dart';
 import '../../core/widgets/calm_surfaces.dart';
+import '../../core/widgets/failure_message.dart';
 import '../../core/widgets/flow_page.dart';
 import '../account/account_store.dart';
 import '../shell/app_root.dart';
+import 'create_home_screen.dart';
 import 'profile_screen.dart';
 
 /// 03 · Six-digit code. Verifies as soon as the sixth digit is typed.
@@ -29,7 +32,7 @@ class _OtpScreenState extends State<OtpScreen> {
   final _focus = FocusNode();
   Timer? _ticker;
   bool _verifying = false;
-  bool _invalid = false;
+  String? _error;
   int _shakes = 0;
 
   @override
@@ -49,14 +52,15 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   Duration get _resendIn {
-    final sentAt = context.app.account.codeSentAt;
+    final account = context.app.account;
+    final sentAt = account.codeSentAt;
     if (sentAt == null) return Duration.zero;
-    final left = AccountStore.resendAfter - DateTime.now().difference(sentAt);
+    final left = account.resendAfter - DateTime.now().difference(sentAt);
     return left.isNegative ? Duration.zero : left;
   }
 
   void _onChanged(String value) {
-    setState(() => _invalid = false);
+    setState(() => _error = null);
     if (value.length == 6) _verify();
   }
 
@@ -64,46 +68,62 @@ class _OtpScreenState extends State<OtpScreen> {
     if (_verifying || _code.text.length != 6) return;
     setState(() => _verifying = true);
     final app = context.app;
-    final outcome = await app.account.verify(_code.text);
+    final l10n = context.l10n;
+    final OtpOutcome outcome;
+    try {
+      outcome = await app.account.verify(_code.text);
+    } on BackendFailure catch (failure) {
+      if (mounted) _reject(l10n.failure(failure));
+      return;
+    }
+    if (outcome == OtpOutcome.invalidCode) {
+      if (mounted) _reject(l10n.codeInvalid);
+      return;
+    }
+    Haptics.confirm();
+    await app.homes.load();
     if (!mounted) return;
-    switch (outcome) {
-      case OtpOutcome.invalidCode:
-        Haptics.warn();
-        setState(() {
-          _verifying = false;
-          _invalid = true;
-          _shakes++;
-          _code.clear();
-        });
-        _focus.requestFocus();
-      case OtpOutcome.existingAccount:
-        Haptics.confirm();
-        app.homes.loadDemoAccount(
-          yourName: app.account.name,
-          yourPhone: app.account.phone!,
-        );
-        enterHome(context);
-      case OtpOutcome.newAccount:
-        Haptics.confirm();
-        app.homes.startNewAccount();
-        setState(() => _verifying = false);
-        await Navigator.of(
-          context,
-        ).push(CupertinoPageRoute<void>(builder: (_) => const ProfileScreen()));
+    setState(() => _verifying = false);
+    if (outcome == OtpOutcome.newAccount) {
+      _open(const ProfileScreen());
+    } else if (app.homes.hasHome || app.homes.loadFailed) {
+      enterHome(context);
+    } else {
+      app.account.startOnboarding();
+      _open(const CreateHomeScreen());
     }
   }
 
+  void _reject(String message) {
+    Haptics.warn();
+    setState(() {
+      _verifying = false;
+      _error = message;
+      _shakes++;
+      _code.clear();
+    });
+    _focus.requestFocus();
+  }
+
+  void _open(Widget screen) =>
+      Navigator.of(context)
+          .push(CupertinoPageRoute<void>(builder: (_) => screen));
+
   Future<void> _resend() async {
-    final phone = context.app.account.phone;
+    final account = context.app.account;
+    final phone = account.phone;
     if (phone == null) return;
-    await context.app.account.requestCode(phone);
+    await attempt(context, () => account.requestCode(phone));
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = context.palette;
-    final phone = context.app.account.phone ?? '';
+    final account = context.app.account;
+    final phone = account.phone ?? '';
+    final debugCode = account.debugCode;
     final resendIn = _resendIn;
     return FlowPage(
       top: const Align(
@@ -118,12 +138,16 @@ class _OtpScreenState extends State<OtpScreen> {
             loading: _verifying,
             onPressed: _code.text.length == 6 ? _verify : null,
           ),
-          const SizedBox(height: 12),
-          Text(
-            l10n.otpDemoNote,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          if (debugCode != null || account.isDemo) ...[
+            const SizedBox(height: 12),
+            Text(
+              debugCode == null
+                  ? l10n.otpDemoNote
+                  : l10n.otpDebugNote(debugCode),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
         ],
       ),
       children: [
@@ -155,19 +179,19 @@ class _OtpScreenState extends State<OtpScreen> {
           child: _CodeBoxes(
             controller: _code,
             focusNode: _focus,
-            invalid: _invalid,
+            invalid: _error != null,
             onChanged: _onChanged,
           ),
         ),
         const SizedBox(height: 14),
         AnimatedSwitcher(
           duration: Motion.of(context, Motion.quick),
-          child: _invalid
+          child: _error != null
               ? Semantics(
                   key: const ValueKey('invalid'),
                   liveRegion: true,
                   child: Text(
-                    l10n.codeInvalid,
+                    _error!,
                     style: TextStyle(color: palette.danger, fontSize: 14),
                   ),
                 )
@@ -311,24 +335,47 @@ class _Box extends StatelessWidget {
   );
 }
 
-/// A short horizontal shake each time [shakes] increases.
-class _Shake extends StatelessWidget {
+/// A short horizontal shake each time [shakes] increases. The child stays
+/// mounted throughout, so the code field keeps its focus and keyboard.
+class _Shake extends StatefulWidget {
   const _Shake({required this.shakes, required this.child});
   final int shakes;
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    if (shakes == 0 || Motion.reduced(context)) return child;
-    return TweenAnimationBuilder<double>(
-      key: ValueKey(shakes),
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 420),
-      child: child,
-      builder: (context, t, child) => Transform.translate(
+  State<_Shake> createState() => _ShakeState();
+}
+
+class _ShakeState extends State<_Shake> with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  );
+
+  @override
+  void didUpdateWidget(_Shake oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.shakes > oldWidget.shakes && !Motion.reduced(context)) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
+    child: widget.child,
+    builder: (context, child) {
+      final t = _controller.value;
+      return Transform.translate(
         offset: Offset(math.sin(t * math.pi * 5) * 8 * (1 - t), 0),
         child: child,
-      ),
-    );
-  }
+      );
+    },
+  );
 }

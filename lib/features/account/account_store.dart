@@ -1,86 +1,136 @@
 import 'package:flutter/foundation.dart';
 
-import '../home/home_models.dart';
+import '../../backend/backend_failure.dart';
+import '../../backend/demo_backend.dart';
+import '../../backend/javis_backend.dart';
 
-enum AccountStage { signedOut, onboarding, signedIn }
+/// `restoring` and `unreachable` only happen at launch with the API.
+enum AccountStage { restoring, unreachable, signedOut, onboarding, signedIn }
 
 enum OtpOutcome { existingAccount, newAccount, invalidCode }
 
-/// Mock phone + OTP session (spec 012). No SMS is sent; any six digits other
-/// than `000000` are accepted so the error state can still be previewed.
+/// The signed-in person and the sign-in flow.
 class AccountStore extends ChangeNotifier {
-  AccountStore({this.networkDelay = const Duration(milliseconds: 700)});
+  AccountStore(this._backend)
+    : _stage = _backend.isDemo
+          ? AccountStage.signedOut
+          : AccountStage.restoring {
+    _backend.onSessionExpired = _clear;
+  }
 
-  /// The demo number that already has an account and homes.
-  static const demoPhone = '0812345678';
-  static const resendAfter = Duration(seconds: 45);
-
-  final Duration networkDelay;
-  AccountStage _stage = AccountStage.signedOut;
+  final JavisBackend _backend;
+  AccountStage _stage;
   String? _phone;
   String? _name;
+  String? _debugCode;
   DateTime? _codeSentAt;
+  Duration _resendAfter = Duration.zero;
+
+  /// Clears what belongs to the account: homes and scenes.
+  VoidCallback? onSignedOut;
 
   AccountStage get stage => _stage;
   bool get signedIn => _stage == AccountStage.signedIn;
+  bool get isDemo => _backend.isDemo;
   String? get phone => _phone;
   String get name => _name ?? '';
+  String? get debugCode => _debugCode;
   DateTime? get codeSentAt => _codeSentAt;
-
-  Member get asMember => Member(
-    id: 'you',
-    name: name,
-    phone: _phone ?? '',
-    role: HomeRole.owner,
-    canUnlock: true,
-    isYou: true,
-  );
+  Duration get resendAfter => _resendAfter;
 
   /// Signs straight into the demo account (used by tests and previews).
   void signInDemo() {
-    _phone = demoPhone;
-    _name = 'มายด์';
+    _phone = DemoBackend.demoPhone;
+    _name = DemoBackend.demoName;
     _stage = AccountStage.signedIn;
     notifyListeners();
   }
 
+  /// Finds a stored session. Returns true when one is valid; the caller loads
+  /// the homes and then calls [completeSignIn].
+  Future<bool> restore() async {
+    _setStage(AccountStage.restoring);
+    try {
+      final user = await _backend.restoreSession();
+      if (user != null && user.name != null) {
+        _adopt(user);
+        return true;
+      }
+      // Sign-up stopped before the profile step: start it again.
+      if (user != null) await _backend.signOut();
+      _setStage(AccountStage.signedOut);
+    } on BackendFailure {
+      _setStage(AccountStage.unreachable);
+    }
+    return false;
+  }
+
   Future<void> requestCode(String phoneDigits) async {
-    await Future<void>.delayed(networkDelay);
+    final challenge = await _backend.requestCode(phoneDigits);
     _phone = phoneDigits;
+    _debugCode = challenge.debugCode;
+    _resendAfter = challenge.resendAfter;
     _codeSentAt = DateTime.now();
     notifyListeners();
   }
 
   Future<OtpOutcome> verify(String code) async {
-    await Future<void>.delayed(networkDelay);
-    if (code.length != 6 || code == '000000') return OtpOutcome.invalidCode;
-    if (_phone == demoPhone) {
-      _name = 'มายด์';
-      return OtpOutcome.existingAccount;
+    final AccountUser user;
+    try {
+      user = await _backend.verifyCode(_phone!, code);
+    } on BackendFailure catch (failure) {
+      if (failure.code == 'invalid_code') return OtpOutcome.invalidCode;
+      rethrow;
     }
-    _stage = AccountStage.onboarding;
-    notifyListeners();
+    _adopt(user);
+    if (user.name != null) return OtpOutcome.existingAccount;
+    _setStage(AccountStage.onboarding);
     return OtpOutcome.newAccount;
   }
 
-  void setName(String name) {
+  /// Moves an existing account with no home into the onboarding steps.
+  void startOnboarding() => _setStage(AccountStage.onboarding);
+
+  Future<void> setName(String name) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
+    final before = _name;
     _name = trimmed;
     notifyListeners();
+    try {
+      await _backend.updateName(trimmed);
+    } on BackendFailure {
+      _name = before;
+      notifyListeners();
+      rethrow;
+    }
   }
 
-  void completeSignIn() {
-    _stage = AccountStage.signedIn;
+  void completeSignIn() => _setStage(AccountStage.signedIn);
+
+  Future<void> signOut() async {
+    _clear();
+    await _backend.signOut();
+  }
+
+  void _adopt(AccountUser user) {
+    _phone = user.phone;
+    _name = user.name;
+    _debugCode = null;
+  }
+
+  void _setStage(AccountStage stage) {
+    _stage = stage;
     notifyListeners();
   }
 
-  void signOut() {
-    _stage = AccountStage.signedOut;
+  void _clear() {
     _phone = null;
     _name = null;
+    _debugCode = null;
     _codeSentAt = null;
-    notifyListeners();
+    onSignedOut?.call();
+    _setStage(AccountStage.signedOut);
   }
 }
 

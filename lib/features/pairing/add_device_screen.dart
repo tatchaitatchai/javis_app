@@ -12,6 +12,7 @@ import '../../core/widgets/calm_sheet.dart';
 import '../../core/widgets/calm_surfaces.dart';
 import '../../core/widgets/calm_switch.dart';
 import '../../core/widgets/calm_text_field.dart';
+import '../../core/widgets/failure_message.dart';
 import '../../core/widgets/flow_page.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/step_bar.dart';
@@ -488,15 +489,24 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
     _zoneChoice ??= widget.zoneId ?? context.app.homes.zoneIdFor(light);
   }
 
-  /// Saves the local name and zone chosen after pairing (spec 012).
+  /// Saves the name and zone chosen after pairing.
   void _saveLabel() {
     final found = _found;
     if (found == null) return;
     final typed = _deviceName.text.trim();
-    context.app.homes.labelDevice(
-      found.id,
-      name: typed == context.lightName(found) ? null : typed,
-      zoneId: _zoneChoice,
+    final name = typed == context.lightName(found) ? null : typed;
+    final homes = context.app.homes;
+    final zoneId = _zoneChoice;
+    unawaited(
+      attempt(
+        context,
+        () => homes.labelDevice(
+          widget.service,
+          found.id,
+          name: name,
+          zoneId: zoneId,
+        ),
+      ),
     );
   }
 

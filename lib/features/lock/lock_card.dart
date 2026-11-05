@@ -16,14 +16,16 @@ class LockCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lock = context.app.lock;
+    final homes = context.app.homes;
     // The door card stays ink in both themes: an inverted cream slab reads
     // as a glare on the dark canvas and drops the gold icon's contrast.
     const palette = CalmPalette.light;
     final l10n = context.l10n;
     return ListenableBuilder(
-      listenable: lock,
+      listenable: Listenable.merge([lock, homes]),
       builder: (context, _) {
         final locked = lock.status == LockStatus.locked;
+        final canUnlock = homes.activeHome?.canUnlock ?? false;
         return Pressable(
           onPressed: () => Navigator.of(
             context,
@@ -72,7 +74,8 @@ class LockCard extends StatelessWidget {
                       ),
                       Text(
                         '${l10n.lockStatus(lock.status.name)} · '
-                        '${l10n.battery(lock.batteryPercent)}',
+                        '${l10n.battery(lock.batteryPercent)} · '
+                        '${l10n.preview}',
                         style: TextStyle(
                           fontSize: 13.5,
                           color: palette.onStrongMuted,
@@ -81,34 +84,36 @@ class LockCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                Pressable(
-                  onPressed: locked ? () => showUnlockSheet(context) : null,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 48),
-                    child: Center(
-                      widthFactor: 1,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: palette.gold,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          l10n.unlock,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: CalmPalette.onGold,
+                if (canUnlock) ...[
+                  const SizedBox(width: 10),
+                  Pressable(
+                    onPressed: locked ? () => showUnlockSheet(context) : null,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      child: Center(
+                        widthFactor: 1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: palette.gold,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            l10n.unlock,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: CalmPalette.onGold,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

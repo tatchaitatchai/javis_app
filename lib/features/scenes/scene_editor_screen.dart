@@ -10,6 +10,7 @@ import '../../core/widgets/calm_segment.dart';
 import '../../core/widgets/calm_sheet.dart';
 import '../../core/widgets/calm_surfaces.dart';
 import '../../core/widgets/calm_text_field.dart';
+import '../../core/widgets/failure_message.dart';
 import '../../core/widgets/flow_page.dart';
 import '../lighting/light_labels.dart';
 import 'scene_labels.dart';
@@ -30,6 +31,7 @@ class _SceneEditorScreenState extends State<SceneEditorScreen> {
   late List<SceneAction> _actions;
   late final TextEditingController _name;
   bool _isNew = false;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -60,18 +62,26 @@ class _SceneEditorScreenState extends State<SceneEditorScreen> {
 
   bool get _canSave => _name.text.trim().isNotEmpty && _actions.isNotEmpty;
 
-  void _save() {
-    if (!_canSave) return;
+  Future<void> _save() async {
+    if (!_canSave || _saving) return;
     final typed = _name.text.trim();
     final keepPreset =
         _original.presetKey != null && typed == _original.label(context.l10n);
-    context.app.scenes.save(
-      _original.copyWith(
-        actions: _actions,
-        customName: keepPreset ? null : typed,
-        clearPreset: !keepPreset,
+    final scenes = context.app.scenes;
+    setState(() => _saving = true);
+    final saved = await attempt(
+      context,
+      () => scenes.save(
+        _original.copyWith(
+          actions: _actions,
+          customName: keepPreset ? null : typed,
+          clearPreset: !keepPreset,
+        ),
       ),
     );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (!saved) return;
     Haptics.confirm();
     Navigator.of(context).pop();
   }
@@ -96,7 +106,9 @@ class _SceneEditorScreenState extends State<SceneEditorScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    context.app.scenes.delete(_original.id);
+    final scenes = context.app.scenes;
+    final deleted = await attempt(context, () => scenes.delete(_original.id));
+    if (!deleted || !mounted) return;
     Haptics.warn();
     Navigator.of(context).pop();
   }
@@ -144,7 +156,7 @@ class _SceneEditorScreenState extends State<SceneEditorScreen> {
         ),
         trailing: QuietButton(
           label: l10n.save,
-          onPressed: _canSave ? _save : null,
+          onPressed: _canSave && !_saving ? _save : null,
         ),
       ),
       footer: _isNew
@@ -273,7 +285,7 @@ class _TargetPicker extends StatelessWidget {
                 chevron: true,
                 onTap: () => pick(light(LightTarget.zone(zone.presetKey!))),
               ),
-            for (final device in app.lighting.devices)
+            for (final device in app.homes.lightsIn(app.lighting))
               ListRow(
                 title: context.lightName(device),
                 subtitle: context.lightZone(device),
