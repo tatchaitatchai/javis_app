@@ -1095,7 +1095,7 @@ void _bleTests() {
     await tester.pumpAndSettle();
     await _openBulbPairing(tester);
     expect(native.startScanCount, 1);
-    expect(find.text('Looking for lights nearby…'), findsWidgets);
+    expect(find.text('Looking for devices nearby…'), findsOneWidget);
     expect(find.text('Open iPhone Settings → Wi-Fi'), findsNothing);
     native.emit({
       'type': 'nearby',
@@ -1104,16 +1104,26 @@ void _bleTests() {
         {'id': 'nearby-1'},
       ],
     });
-    // Event → post-frame sheet push → route animation start → finish.
     await tester.pump();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('A new light is nearby.'), findsOneWidget);
     expect(native.service.nearbyDevices.length, 1);
-    await tester.tap(find.text('New light 1').last);
+    expect(find.text('New device 1'), findsOneWidget);
+    native.emit({
+      'type': 'nearby',
+      'devices': [
+        {
+          'id': 'nearby-1',
+          'name': ' Wi-Fi Smart Lock ',
+          'iconUrl': 'http://not-secure.example/icon.png',
+        },
+        {'id': '', 'name': 'No id'},
+      ],
+    });
+    await tester.pump();
+    expect(native.service.nearbyDevices.single.iconUrl, isNull);
+    await tester.tap(find.byKey(const ValueKey('radar-nearby-1')));
     await tester.pumpAndSettle();
-    expect(find.text('A new light is nearby.'), findsNothing);
+    expect(find.text('Wi-Fi Smart Lock'), findsOneWidget);
     expect(find.byKey(const ValueKey('selected-home-wifi')), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('pairing-password')),
@@ -1125,7 +1135,7 @@ void _bleTests() {
       _network.password,
     );
     await tester.pump();
-    await tester.tap(find.text('Connect a light'));
+    await tester.tap(find.text('Connect device'));
     await tester.pump();
     expect(native.preparePairingCount, 0);
     expect(native.lastPairing, {
@@ -1169,7 +1179,7 @@ void _bleTests() {
     await tester.pump();
     expect(find.textContaining('Bluetooth is off.'), findsNothing);
     expect(find.textContaining('not allowed to use Bluetooth'), findsNothing);
-    expect(find.text('Looking for lights nearby…'), findsWidgets);
+    expect(find.text('Looking for devices nearby…'), findsOneWidget);
     expect(native.startScanCount, 1);
     expect(tester.takeException(), isNull);
   });
@@ -1198,7 +1208,7 @@ void _bleTests() {
     });
     await tester.pump();
     expect(native.service.nearbyDevices, isEmpty);
-    expect(find.text('A new light is nearby.'), findsNothing);
+    expect(find.text('New device 1'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('use-nearby-setup')));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
@@ -1419,13 +1429,10 @@ class _NativeHarness {
   void failStream() => _sink!.error(code: 'transportFailure');
 }
 
-/// Dashboard “+” → device type → light bulb. Real mode opens on the
-/// Bluetooth scan, whose progress indicator never settles, so the route
+/// Dashboard “+” → the radar. Its sweep never settles, so the route
 /// transition is pumped for a fixed time.
 Future<void> _openBulbPairing(WidgetTester tester) async {
   await tester.tap(find.byTooltip('Add device'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Light bulb'));
   await tester.pump();
   await tester.pump(const Duration(seconds: 1));
 }

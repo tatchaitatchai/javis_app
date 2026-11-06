@@ -18,10 +18,22 @@ import '../../core/widgets/pressable.dart';
 import '../../core/widgets/step_bar.dart';
 import '../lighting/light_labels.dart';
 import '../lighting/lighting_service.dart';
+import 'nearby_device_icon.dart';
 import 'nearby_pairing.dart';
 import 'pairing_widgets.dart';
 
 enum _PairingStage { prepare, searching, found, failure, success, cancelled }
+
+/// Opens “Add device” as a sheet-style page over the current tab.
+void openAddDevice(BuildContext context, {String? zoneId}) {
+  final lighting = context.app.lighting;
+  Navigator.of(context).push(
+    CupertinoPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => AddDeviceScreen(service: lighting, zoneId: zoneId),
+    ),
+  );
+}
 
 class AddDeviceScreen extends StatefulWidget {
   const AddDeviceScreen({required this.service, this.zoneId, super.key});
@@ -59,42 +71,46 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
   final _deviceName = TextEditingController();
   String? _zoneChoice;
 
-  /// Real pairing starts with the Bluetooth scan (spec 013); Wi-Fi setup
-  /// (EZ/AP) is the fallback for bulbs that never appear nearby.
+  /// Every search starts on the radar (spec 018); Wi-Fi setup (EZ/AP) is the
+  /// fallback for bulbs that never appear nearby.
   bool _nearbyMode = true;
   String? _selectedNearby;
-  bool _nearbyOffered = false;
-  bool _sheetOpen = false;
   bool _scanStarting = false;
 
-  bool get _usesNearby => _nearbyMode && !widget.service.isDemo;
+  bool get _usesNearby => _nearbyMode;
 
-  bool get _canPair => _usesNearby
-      ? widget.service.readiness == LightingReadiness.ready &&
-            !widget.service.preparingHome &&
-            _selectedNearby != null &&
-            _ssid.text.trim().isNotEmpty &&
-            _password.text.isNotEmpty
-      : widget.service.readiness == LightingReadiness.ready &&
-            !widget.service.preparingHome &&
-            !_preparingPairing &&
-            !_discovering &&
-            !_loadingNetworks &&
-            (!_ezSelected ||
-                widget.service.isDemo ||
-                (!_checkingEz && (_capabilities?.ezAvailable ?? false))) &&
-            (widget.service.isDemo ||
-                (_ssid.text.trim().isNotEmpty &&
-                    _password.text.isNotEmpty &&
-                    (_discoveredHotspot == null ||
-                        _availableNetworks.contains(_ssid.text))));
+  bool get _onRadar =>
+      _usesNearby &&
+      _selectedNearby == null &&
+      _stage == _PairingStage.prepare &&
+      widget.service.readiness == LightingReadiness.ready;
+
+  bool get _canPair {
+    if (widget.service.isDemo) return true;
+    return _usesNearby
+        ? widget.service.readiness == LightingReadiness.ready &&
+              !widget.service.preparingHome &&
+              _selectedNearby != null &&
+              _ssid.text.trim().isNotEmpty &&
+              _password.text.isNotEmpty
+        : widget.service.readiness == LightingReadiness.ready &&
+              !widget.service.preparingHome &&
+              !_preparingPairing &&
+              !_discovering &&
+              !_loadingNetworks &&
+              (!_ezSelected ||
+                  (!_checkingEz && (_capabilities?.ezAvailable ?? false))) &&
+              _ssid.text.trim().isNotEmpty &&
+              _password.text.isNotEmpty &&
+              (_discoveredHotspot == null ||
+                  _availableNetworks.contains(_ssid.text));
+  }
 
   @override
   void initState() {
     super.initState();
     widget.service.addListener(_onServiceChanged);
-    if (!widget.service.isDemo &&
-        widget.service.readiness == LightingReadiness.ready) {
+    if (widget.service.readiness == LightingReadiness.ready) {
       // Starting a scan notifies other listeners, which cannot happen mid-build.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_startScan());
@@ -108,7 +124,6 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
     setState(() {
       _setupError = null;
       _selectedNearby = null;
-      _nearbyOffered = false;
       _password.clear();
       _showPassword = false;
     });
@@ -137,37 +152,16 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
           unawaited(_startScan());
         }
       });
-      return;
-    }
-    _maybeOfferNearby();
-  }
-
-  /// Offers the first light found in a sheet, once per scan.
-  void _maybeOfferNearby() {
-    if (_sheetOpen ||
-        _nearbyOffered ||
-        _selectedNearby != null ||
-        _stage != _PairingStage.prepare ||
-        widget.service.nearbyDevices.isEmpty) {
-      return;
-    }
-    _nearbyOffered = true;
-    _sheetOpen = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _offerNearby());
-  }
-
-  Future<void> _offerNearby() async {
-    if (!mounted) return;
-    final generation = _setupGeneration;
-    final chosen = await showNearbyFoundSheet(context, widget.service);
-    _sheetOpen = false;
-    if (chosen != null && _isCurrentSetup(generation)) {
-      await _chooseNearby(chosen);
     }
   }
 
   Future<void> _chooseNearby(String id) async {
     if (!widget.service.nearbyDevices.any((d) => d.id == id)) return;
+    if (widget.service.isDemo) {
+      setState(() => _selectedNearby = id);
+      await _search();
+      return;
+    }
     final generation = _setupGeneration;
     setState(() {
       _selectedNearby = id;
@@ -579,7 +573,7 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
                   child: FlowTopBar(
-                    leading: const CalmBackButton(),
+                    leading: const CalmBackButton(close: true),
                     center: Semantics(
                       label: context.l10n.pairingStep(_step),
                       excludeSemantics: true,
@@ -612,11 +606,10 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
         const SizedBox(height: 18),
       ],
       ..._content(context),
-      DemoNote(
-        text: widget.service.isDemo
-            ? context.l10n.pairingNote
-            : context.l10n.realDeviceMode,
-      ),
+      if (widget.service.isDemo)
+        DemoNote(text: context.l10n.pairingNote)
+      else if (!_onRadar)
+        DemoNote(text: context.l10n.realDeviceMode),
     ],
   );
 
@@ -624,9 +617,7 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
     final l10n = context.l10n;
     final title = switch (_stage) {
       _PairingStage.prepare =>
-        widget.service.isDemo
-            ? l10n.pairingPrepare
-            : widget.service.readiness != LightingReadiness.ready
+        widget.service.readiness != LightingReadiness.ready
             ? widget.service.readiness == LightingReadiness.sessionRequired
                   ? l10n.pairingHomeTitle
                   : l10n.providerStatus(widget.service.readiness.name)
@@ -652,9 +643,7 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
     };
     final description = switch (_stage) {
       _PairingStage.prepare =>
-        widget.service.isDemo
-            ? l10n.prepareDescription
-            : widget.service.readiness != LightingReadiness.ready
+        widget.service.readiness != LightingReadiness.ready
             ? widget.service.readiness == LightingReadiness.sessionRequired
                   ? l10n.pairingHomeIntro
                   : l10n.providerDescription(widget.service.readiness.name)
@@ -798,22 +787,6 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
     if (_stage == _PairingStage.success) {
       return [if (_found != null) _successForm(context)];
     }
-    if (widget.service.isDemo) {
-      return [
-        _note(CupertinoIcons.sparkles, l10n.pairingDemoHint),
-        const SizedBox(height: 8),
-        ListRow(
-          title: l10n.previewFailure,
-          subtitle: l10n.optionalDemo,
-          onTap: () => setState(() => _simulateFailure = !_simulateFailure),
-          trailing: CalmSwitch(
-            value: _simulateFailure,
-            semanticLabel: l10n.previewFailure,
-            onChanged: (value) => setState(() => _simulateFailure = value),
-          ),
-        ),
-      ];
-    }
     if (widget.service.readiness != LightingReadiness.ready) {
       return [
         _note(
@@ -836,10 +809,26 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
             onChoose: _chooseNearby,
           ),
           if (_setupError != null) _errorText(context, _setupError!),
+          if (widget.service.isDemo) ...[
+            const SizedBox(height: 8),
+            ListRow(
+              title: l10n.previewFailure,
+              subtitle: l10n.optionalDemo,
+              onTap: () => setState(() => _simulateFailure = !_simulateFailure),
+              trailing: CalmSwitch(
+                value: _simulateFailure,
+                semanticLabel: l10n.previewFailure,
+                onChanged: (value) => setState(() => _simulateFailure = value),
+              ),
+            ),
+          ],
         ];
       }
       return [
-        _note(CupertinoIcons.lightbulb_fill, _selectedNearbyLabel(context)),
+        _note(
+          CupertinoIcons.dot_radiowaves_left_right,
+          _selectedNearbyLabel(context),
+        ),
         const SizedBox(height: 20),
         _networkForm(context),
         if (_setupError != null) _errorText(context, _setupError!),
@@ -926,12 +915,13 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
 
   Widget _note(IconData icon, String text) => InfoNote(icon: icon, text: text);
 
-  /// Matches the numbered label the scan list showed for this light.
+  /// Matches the label the scan list showed for this device.
   String _selectedNearbyLabel(BuildContext context) {
-    final index = widget.service.nearbyDevices.indexWhere(
-      (d) => d.id == _selectedNearby,
-    );
-    return context.l10n.nearbyLight(index < 0 ? 1 : index + 1);
+    final devices = widget.service.nearbyDevices;
+    final index = devices.indexWhere((d) => d.id == _selectedNearby);
+    return index < 0
+        ? context.l10n.nearbyDeviceNumbered(1)
+        : context.nearbyDeviceName(devices[index], index);
   }
 
   Widget _modeSelector(BuildContext context) => Column(
@@ -999,13 +989,10 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
     final String label;
     final VoidCallback? action;
     var loading = false;
+    var showPrimary = true;
     switch (_stage) {
       case _PairingStage.prepare:
-        if (widget.service.isDemo) {
-          label = l10n.startPairing;
-          action = _canPair ? _search : null;
-        } else if (widget.service.readiness ==
-            LightingReadiness.sessionRequired) {
+        if (widget.service.readiness == LightingReadiness.sessionRequired) {
           label = widget.service.preparingHome
               ? l10n.preparingHome
               : l10n.prepareDemoHome;
@@ -1018,17 +1005,15 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
               : widget.service.initialize;
         } else if (_usesNearby) {
           if (_selectedNearby != null) {
-            label = l10n.realPairing;
+            label = l10n.connectDevice;
             action = _canPair ? _search : null;
           } else if (_setupError != null) {
             label = l10n.retry;
             action = _startScan;
           } else {
-            final bluetooth = widget.service.bluetooth;
-            label = l10n.nearbySearching;
-            loading =
-                bluetooth == BluetoothState.on ||
-                bluetooth == BluetoothState.unknown;
+            // The radar shows the search, and each found device has its Add.
+            showPrimary = false;
+            label = '';
             action = null;
           }
         } else if (_ezSelected) {
@@ -1095,7 +1080,7 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  primary,
+                  if (showPrimary) primary,
                   ..._modeButtons(context),
                   if (_stage == _PairingStage.prepare &&
                       !widget.service.isDemo &&
@@ -1142,7 +1127,7 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
       return [
         if (_selectedNearby != null)
           QuietButton(
-            label: l10n.chooseAnotherLight,
+            label: l10n.chooseAnotherDevice,
             onPressed: () => setState(() {
               _selectedNearby = null;
               _setupError = null;

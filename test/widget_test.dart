@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:javis_app/app.dart';
 import 'package:javis_app/core/localization/app_localizations.dart';
+import 'package:javis_app/core/theme/app_theme.dart';
 import 'package:javis_app/features/lighting/lighting_service.dart';
+import 'package:javis_app/features/pairing/nearby_radar.dart';
 
 void main() {
   testWidgets('Existing number signs in with OTP and lands on the home', (
@@ -91,6 +93,7 @@ void main() {
       addTearDown(service.dispose);
       await _signedIn(tester, service);
       await _openBulbPairing(tester);
+      await _waitForSampleBulb(tester);
       await tester.scrollUntilVisible(
         find.text('Preview a failed search'),
         250,
@@ -98,7 +101,12 @@ void main() {
       );
       await tester.tap(find.text('Preview a failed search'));
       await tester.pump();
-      await tester.tap(find.text('Start demo pairing'));
+      await tester.dragUntilVisible(
+        find.text('Smart bulb'),
+        find.byType(Scrollable).last,
+        const Offset(0, 250),
+      );
+      await tester.tap(find.text('Smart bulb'));
       await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Try again'));
@@ -311,6 +319,78 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Add device opens straight on the radar, in Thai too', (
+    tester,
+  ) async {
+    final service = MockLightingService();
+    addTearDown(service.dispose);
+    await _signedIn(tester, service);
+    await _openBulbPairing(tester);
+    expect(find.byType(NearbyRadar), findsOneWidget);
+    expect(find.text('Looking for devices nearby…'), findsOneWidget);
+    expect(find.text('Light bulb'), findsNothing);
+    _setLocale(tester, const Locale('th'));
+    await tester.pump();
+    expect(find.text('กำลังค้นหาอุปกรณ์ใกล้ตัว…'), findsOneWidget);
+    await _waitForSampleBulb(tester);
+    expect(find.text('Smart bulb'), findsOneWidget);
+    expect(find.text('พบ 1 อุปกรณ์ · ยังค้นหาต่อ'), findsOneWidget);
+    expect(find.byKey(const ValueKey('radar-demo-bulb')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('A device can be added from the radar itself', (tester) async {
+    final service = MockLightingService();
+    addTearDown(service.dispose);
+    await _signedIn(tester, service);
+    await _openBulbPairing(tester);
+    await _waitForSampleBulb(tester);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.byKey(const ValueKey('radar-demo-bulb')));
+    await tester.pump();
+    expect(find.byType(NearbyRadar), findsNothing);
+    expect(find.text('Searching sample devices…'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('The radar fits with text at twice the size', (tester) async {
+    final service = MockLightingService();
+    addTearDown(service.dispose);
+    await _signedIn(tester, service);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await _openBulbPairing(tester);
+    await _waitForSampleBulb(tester);
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('Table lamp'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Reduce Motion leaves the radar still', (tester) async {
+    Widget radar({required bool reduced}) => MaterialApp(
+      theme: calmTheme(Brightness.light),
+      home: MediaQuery(
+        data: MediaQueryData(disableAnimations: reduced),
+        child: Scaffold(
+          body: NearbyRadar(
+            devices: const [NearbyDevice('nearby-1')],
+            searching: true,
+            onChoose: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpWidget(radar(reduced: false));
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.hasRunningAnimations, isTrue);
+    await tester.pumpWidget(radar(reduced: true));
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.hasRunningAnimations, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Thai and English switch from Me without losing light state', (
     tester,
   ) async {
@@ -350,7 +430,8 @@ void main() {
     addTearDown(service.dispose);
     await _signedIn(tester, service);
     await _openBulbPairing(tester);
-    await tester.tap(find.text('Start demo pairing'));
+    await _waitForSampleBulb(tester);
+    await tester.tap(find.text('Smart bulb'));
     await tester.pump();
     expect(find.text('Searching sample devices…'), findsOneWidget);
     _setLocale(tester, const Locale('th'));
@@ -377,13 +458,17 @@ Future<void> _signedIn(WidgetTester tester, LightingService service) async {
   await tester.pumpAndSettle();
 }
 
-/// Dashboard “+” → device type → light bulb.
+/// Dashboard “+” → the radar. It never settles, so the route is pumped for a
+/// fixed time.
 Future<void> _openBulbPairing(WidgetTester tester) async {
   await tester.tap(find.byTooltip('Add device'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Light bulb'));
-  await tester.pumpAndSettle();
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
 }
+
+/// Lets the sample scan find its first device.
+Future<void> _waitForSampleBulb(WidgetTester tester) =>
+    tester.pump(const Duration(seconds: 2));
 
 /// Lets the simulated network delay finish.
 Future<void> _settleNetwork(WidgetTester tester) async {

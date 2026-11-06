@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -229,7 +231,7 @@ class PowerButton extends StatelessWidget {
   }
 }
 
-/// Warm-to-cool gradient slider for white temperature.
+/// Gradient slider: warm-to-cool for white temperature, or any [colors] scale.
 class ToneSlider extends StatelessWidget {
   const ToneSlider({
     required this.value,
@@ -238,8 +240,17 @@ class ToneSlider extends StatelessWidget {
     required this.enabled,
     required this.onChanged,
     required this.onChangeEnd,
+    required this.semanticLabel,
+    required this.semanticValue,
+    this.colors = warmToCool,
     super.key,
   });
+
+  static const warmToCool = [
+    Color(0xFFF2C57C),
+    Color(0xFFFFF4E0),
+    Color(0xFFD9E6F5),
+  ];
 
   final double value;
   final double min;
@@ -247,15 +258,17 @@ class ToneSlider extends StatelessWidget {
   final bool enabled;
   final ValueChanged<double> onChanged;
   final ValueChanged<double> onChangeEnd;
+  final String semanticLabel;
+  final String Function(double value) semanticValue;
+  final List<Color> colors;
 
   static const _thumb = 30.0;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final l10n = context.l10n;
     final fraction = ((value - min) / (max - min)).clamp(0.0, 1.0);
-    double kelvinAt(double dx, double width) {
+    double valueAt(double dx, double width) {
       final t = ((dx - _thumb / 2) / (width - _thumb)).clamp(0.0, 1.0);
       return (min + t * (max - min)).roundToDouble();
     }
@@ -265,10 +278,10 @@ class ToneSlider extends StatelessWidget {
     void step(double delta) => onChangeEnd(stepped(delta));
     return Semantics(
       slider: true,
-      label: l10n.temperature,
-      value: l10n.kelvin(value.round()),
-      increasedValue: l10n.kelvin(stepped(.1).round()),
-      decreasedValue: l10n.kelvin(stepped(-.1).round()),
+      label: semanticLabel,
+      value: semanticValue(value),
+      increasedValue: semanticValue(stepped(.1)),
+      decreasedValue: semanticValue(stepped(-.1)),
       onIncrease: enabled ? () => step(.1) : null,
       onDecrease: enabled ? () => step(-.1) : null,
       excludeSemantics: true,
@@ -277,16 +290,16 @@ class ToneSlider extends StatelessWidget {
           final width = constraints.maxWidth;
           return GestureDetector(
             onHorizontalDragStart: enabled
-                ? (d) => onChanged(kelvinAt(d.localPosition.dx, width))
+                ? (d) => onChanged(valueAt(d.localPosition.dx, width))
                 : null,
             onHorizontalDragUpdate: enabled
-                ? (d) => onChanged(kelvinAt(d.localPosition.dx, width))
+                ? (d) => onChanged(valueAt(d.localPosition.dx, width))
                 : null,
             onHorizontalDragEnd: enabled ? (_) => onChangeEnd(value) : null,
             onTapUp: enabled
                 ? (d) {
                     Haptics.tap();
-                    onChangeEnd(kelvinAt(d.localPosition.dx, width));
+                    onChangeEnd(valueAt(d.localPosition.dx, width));
                   }
                 : null,
             child: AnimatedOpacity(
@@ -301,13 +314,7 @@ class ToneSlider extends StatelessWidget {
                       height: 36,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFFF2C57C),
-                            Color(0xFFFFF4E0),
-                            Color(0xFFD9E6F5),
-                          ],
-                        ),
+                        gradient: LinearGradient(colors: colors),
                       ),
                     ),
                     AnimatedPositioned(
@@ -356,6 +363,18 @@ class ColorSwatches extends StatelessWidget {
   final bool enabled;
   final ValueChanged<Color> onSelected;
 
+  /// A bulb reports hue and saturation only, in whole steps, so a swatch is
+  /// selected when those are close rather than when the colors are identical.
+  bool _matches(Color swatch) {
+    final current = selected;
+    if (current == null) return false;
+    final a = HSVColor.fromColor(swatch);
+    final b = HSVColor.fromColor(current);
+    final hueGap = (a.hue - b.hue).abs();
+    return math.min(hueGap, 360 - hueGap) <= 3 &&
+        (a.saturation - b.saturation).abs() <= .03;
+  }
+
   static const swatches = [
     (Color(0xFFD7B8CD), 'Rose'),
     (Color(0xFFBDB3DB), 'Lavender'),
@@ -374,7 +393,7 @@ class ColorSwatches extends StatelessWidget {
           onPressed: enabled ? () => onSelected(swatch.$1) : null,
           tooltip: context.l10n.swatch(swatch.$2),
           semanticLabel: context.l10n.swatch(swatch.$2),
-          selected: selected == swatch.$1,
+          selected: _matches(swatch.$1),
           excludeChildSemantics: true,
           pressedScale: .9,
           child: AnimatedContainer(
@@ -385,13 +404,13 @@ class ColorSwatches extends StatelessWidget {
               shape: BoxShape.circle,
               color: swatch.$1,
               border: Border.all(
-                color: selected == swatch.$1
+                color: _matches(swatch.$1)
                     ? context.palette.text
                     : Colors.transparent,
                 width: 2.5,
               ),
             ),
-            child: selected == swatch.$1
+            child: _matches(swatch.$1)
                 ? const Icon(
                     CupertinoIcons.checkmark_alt,
                     size: 22,
@@ -402,4 +421,65 @@ class ColorSwatches extends StatelessWidget {
         ),
     ],
   );
+}
+
+/// Hue and saturation for fine color, below the swatches.
+class ColorSliders extends StatelessWidget {
+  const ColorSliders({
+    required this.color,
+    required this.enabled,
+    required this.onChanged,
+    required this.onChangeEnd,
+    super.key,
+  });
+
+  final HSVColor color;
+  final bool enabled;
+  final ValueChanged<HSVColor> onChanged;
+  final ValueChanged<HSVColor> onChangeEnd;
+
+  static const _hues = [
+    Color(0xFFFF0000),
+    Color(0xFFFFFF00),
+    Color(0xFF00FF00),
+    Color(0xFF00FFFF),
+    Color(0xFF0000FF),
+    Color(0xFFFF00FF),
+    Color(0xFFFF0000),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final vivid = color.withSaturation(1).withValue(1).toColor();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ToneSlider(
+          value: color.hue,
+          min: 0,
+          max: 360,
+          enabled: enabled,
+          colors: _hues,
+          semanticLabel: l10n.hue,
+          semanticValue: (value) => '${value.round()}°',
+          onChanged: (value) => onChanged(color.withHue(value)),
+          onChangeEnd: (value) => onChangeEnd(color.withHue(value)),
+        ),
+        const SizedBox(height: 8),
+        ToneSlider(
+          value: color.saturation * 100,
+          min: 0,
+          max: 100,
+          enabled: enabled,
+          colors: [Colors.white, vivid],
+          semanticLabel: l10n.saturation,
+          semanticValue: (value) => '${value.round()}%',
+          onChanged: (value) => onChanged(color.withSaturation(value / 100)),
+          onChangeEnd: (value) =>
+              onChangeEnd(color.withSaturation(value / 100)),
+        ),
+      ],
+    );
+  }
 }

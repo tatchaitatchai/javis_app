@@ -35,6 +35,8 @@ private final class TuyaLightingAdapter: NSObject, LightingNativeAdapter, ThingS
   private var observedDevices: [String: ThingSmartDevice] = [:]
   private var powerDPIDs: [String: String] = [:]
   private var reportedPower: [String: Bool] = [:]
+  private var reportedDPs: [String: [String: Any]] = [:]
+  private var lightProfiles: [String: TuyaLightProfile] = [:]
   private var pendingCommandTokens: [String: UUID] = [:]
   private var commandTimers: [String: DispatchWorkItem] = [:]
   private var removingDeviceIDs: Set<String> = []
@@ -73,6 +75,7 @@ private final class TuyaLightingAdapter: NSObject, LightingNativeAdapter, ThingS
   private var nearbyModels: [String: ThingBLEAdvModel] = [:]
   private var nearbyIDsByUUID: [String: String] = [:]
   private var nearbyOrder: [String] = []
+  private var nearbyProducts: [String: NearbyProduct] = [:]
   private var bleAttemptUUID: String?
 
   func pairingCapabilities() -> [String: Any] {
@@ -582,14 +585,8 @@ private final class TuyaLightingAdapter: NSObject, LightingNativeAdapter, ThingS
       completion(.failure(failure("unavailable", "The light is offline or no longer belongs to this home.")))
       return
     }
-    guard Set(command.keys) == Set(["isOn"]),
-      let desired = reportedBoolean(command["isOn"]),
-      let dpID = verifiedPowerDPID(homeModel: model, liveModel: device.deviceModel),
-      powerDPIDs[deviceID] == dpID,
-      reportedPower[deviceID] != nil ||
-        reportedBoolean(device.deviceModel.dps?[dpID]) != nil ||
-        reportedBoolean(model.dps?[dpID]) != nil else {
-      completion(.failure(failure("unsupportedCommand", "This light does not report a supported power switch.")))
+    guard let dataPoints = dataPoints(for: command, model: model, device: device), !dataPoints.isEmpty else {
+      completion(.failure(failure("unsupportedCommand", "This light does not support that command.")))
       return
     }
     guard pendingCommandTokens[deviceID] == nil else {
@@ -606,7 +603,7 @@ private final class TuyaLightingAdapter: NSObject, LightingNativeAdapter, ThingS
     }
     commandTimers[deviceID] = timeout
     DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: timeout)
-    device.publishDps([dpID: desired], success: { [weak self] in
+    device.publishDps(dataPoints, success: { [weak self] in
       self?.onMain {
         self?.finishCommand(deviceID: deviceID, token: token, outcome: .success(()), completion: completion)
       }
@@ -640,6 +637,8 @@ private final class TuyaLightingAdapter: NSObject, LightingNativeAdapter, ThingS
         self.observedDevices[deviceID]?.delegate = nil
         self.observedDevices.removeValue(forKey: deviceID)
         self.reportedPower.removeValue(forKey: deviceID)
+        self.reportedDPs.removeValue(forKey: deviceID)
+        self.lightProfiles.removeValue(forKey: deviceID)
         self.powerDPIDs.removeValue(forKey: deviceID)
         self.emitDeviceSnapshot()
         completion(.success(self.devices))
@@ -669,6 +668,7 @@ private final class TuyaLightingAdapter: NSObject, LightingNativeAdapter, ThingS
         let power = self.reportedBoolean(dps[dpID]) {
         self.reportedPower[device.devId] = power
       }
+      self.reportedDPs[device.devId, default: [:]].merge(self.stringKeyed(dps)) { _, new in new }
       self.emitDeviceSnapshot()
     }
   }
@@ -751,8 +751,10 @@ private final class TuyaLightingAdapter: NSObject, LightingNativeAdapter, ThingS
       observedDevices[id]?.delegate = nil
       observedDevices.removeValue(forKey: id)
       reportedPower.removeValue(forKey: id)
+      reportedDPs.removeValue(forKey: id)
     }
     powerDPIDs.removeAll()
+    lightProfiles.removeAll()
     return models.compactMap { model in
       guard let id = model.devId, !id.isEmpty,
         !removedDeviceIDs.contains(id) else { return nil }
@@ -766,11 +768,59 @@ private final class TuyaLightingAdapter: NSObject, LightingNativeAdapter, ThingS
         reportedPower[model.devId] ?? reportedBoolean(liveModel?.dps?[id]) ?? reportedBoolean(model.dps?[id])
       }
       if let dpID, reported != nil { powerDPIDs[id] = dpID }
-      return ["id": id, "name": liveModel?.name ?? model.name ?? "Smart bulb", "room": "",
-        "online": liveModel?.isOnline ?? model.isOnline, "isOn": reported ?? false,
-        "capabilities": ["power": dpID != nil && reported != nil,
-          "brightness": false, "temperature": false, "color": false]]
+      let dps = knownDPs(id, homeModel: model, liveModel: liveModel)
+      let profile = lightProfile(homeModel: model, liveModel: liveModel, reported: dps)
+      lightProfiles[id] = profile
+      var capabilities = profile.capabilities
+      capabilities["power"] = dpID != nil && reported != nil
+      var snapshot: [String: Any] = ["id": id, "name": liveModel?.name ?? model.name ?? "Smart bulb",
+        "room": "", "online": liveModel?.isOnline ?? model.isOnline, "isOn": reported ?? false,
+        "capabilities": capabilities]
+      snapshot.merge(profile.state(reported: dps)) { _, new in new }
+      return snapshot
     }
+  }
+
+  private func dataPoints(for command: [String: Any], model: ThingSmartDeviceModel,
+    device: ThingSmartDevice) -> [String: Any]? {
+    let deviceID = device.devId ?? ""
+    let dps = knownDPs(deviceID, homeModel: model, liveModel: device.deviceModel)
+    guard let profile = lightProfiles[deviceID],
+      var result = profile.dataPoints(for: command, reported: dps) else { return nil }
+    if let isOn = command["isOn"] {
+      guard let desired = reportedBoolean(isOn), let dpID = powerDPIDs[deviceID],
+        dpID == verifiedPowerDPID(homeModel: model, liveModel: device.deviceModel),
+        reportedBoolean(dps[dpID]) != nil else { return nil }
+      result[dpID] = desired
+    }
+    return result
+  }
+
+  /// Everything the bulb has told us, newest last. Device events win.
+  private func knownDPs(_ id: String, homeModel: ThingSmartDeviceModel,
+    liveModel: ThingSmartDeviceModel?) -> [String: Any] {
+    var known = stringKeyed(homeModel.dps ?? [:])
+    known.merge(stringKeyed(liveModel?.dps ?? [:])) { _, new in new }
+    known.merge(reportedDPs[id] ?? [:]) { _, new in new }
+    return known
+  }
+
+  private func stringKeyed(_ dps: [AnyHashable: Any]) -> [String: Any] {
+    var keyed: [String: Any] = [:]
+    for (key, value) in dps { keyed[String(describing: key.base)] = value }
+    return keyed
+  }
+
+  private func lightProfile(homeModel: ThingSmartDeviceModel, liveModel: ThingSmartDeviceModel?,
+    reported: [String: Any]) -> TuyaLightProfile {
+    let schema = liveModel?.schemaArray ?? homeModel.schemaArray ?? []
+    let items = schema.map { item in
+      LightSchemaItem(dpID: item.dpId, code: item.code, mode: item.mode,
+        type: item.property?.type ?? "", min: Int(item.property?.min ?? 0),
+        max: Int(item.property?.max ?? 0),
+        options: item.property?.range?.compactMap { $0 as? String } ?? [])
+    }
+    return TuyaLightProfile(items: items, reported: reported)
   }
 
   private func verifiedPowerDPID(homeModel: ThingSmartDeviceModel,
@@ -836,6 +886,7 @@ extension TuyaLightingAdapter {
     nearbyModels = [:]
     nearbyIDsByUUID = [:]
     nearbyOrder = []
+    nearbyProducts = [:]
     emitNearby()
     if manager.isPoweredOn { startListeningIfNeeded() }
     // The first state update can arrive after this reply, or never if the
@@ -857,6 +908,7 @@ extension TuyaLightingAdapter {
     nearbyModels = [:]
     nearbyIDsByUUID = [:]
     nearbyOrder = []
+    nearbyProducts = [:]
   }
 
   private func startBLEPairing(operationID: String, deviceID: String?, ssid: String, password: String) throws {
@@ -941,6 +993,7 @@ extension TuyaLightingAdapter {
         id = "nearby-\(self.nearbyCounter)"
         self.nearbyIDsByUUID[uuid] = id
         self.nearbyOrder.append(id)
+        self.queryNearbyProduct(id: id, uuid: uuid, productId: deviceInfo.productId)
       }
       self.nearbyModels[id] = deviceInfo
       self.emitNearby()
@@ -964,8 +1017,42 @@ extension TuyaLightingAdapter {
     onEvent?(["type": "bluetooth", "state": state])
   }
 
+  /// Fetches the name and picture shown on the radar, once per device. A failed
+  /// query is not an error: the device stays usable with the generic label.
+  private func queryNearbyProduct(id: String, uuid: String, productId: String?) {
+    guard let productId, !productId.isEmpty else { return }
+    ThingSmartBLEManager.sharedInstance().queryDeviceInfo(
+      withUUID: uuid, productId: productId,
+      success: { [weak self] info in
+        self?.onMain { [weak self] in
+          guard let self, self.nearbyIDsByUUID[uuid] == id else { return }
+          self.nearbyProducts[id] = NearbyProduct(info)
+          self.emitNearby()
+        }
+      },
+      failure: { _ in })
+  }
+
   private func emitNearby() {
-    onEvent?(["type": "nearby", "devices": nearbyOrder.map { ["id": $0] }])
+    let devices = nearbyOrder.map { id -> [String: String] in
+      var device = ["id": id]
+      device["name"] = nearbyProducts[id]?.name
+      device["iconUrl"] = nearbyProducts[id]?.iconUrl
+      return device
+    }
+    onEvent?(["type": "nearby", "devices": devices])
+  }
+}
+
+/// What Tuya says about a product before it is activated. The SDK's dictionary
+/// has no documented keys (spec 018), so either field can be missing.
+private struct NearbyProduct {
+  let name: String?
+  let iconUrl: String?
+
+  init(_ info: [AnyHashable: Any]?) {
+    name = info?["name"] as? String
+    iconUrl = info?["icon"] as? String
   }
 }
 

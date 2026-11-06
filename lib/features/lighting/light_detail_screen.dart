@@ -32,6 +32,7 @@ class _LightDetailScreenState extends State<LightDetailScreen>
   bool _error = false;
   double? _brightnessDraft;
   double? _temperatureDraft;
+  HSVColor? _colorDraft;
 
   Future<void> _update(LightCommand command) async {
     if (_pending) return;
@@ -49,6 +50,7 @@ class _LightDetailScreenState extends State<LightDetailScreen>
           _pending = false;
           _brightnessDraft = null;
           _temperatureDraft = null;
+          _colorDraft = null;
         });
       }
     }
@@ -216,6 +218,17 @@ class _LightDetailScreenState extends State<LightDetailScreen>
             enabled: adjustable,
             onSelected: (color) => _update(LightCommand(color: color)),
           ),
+          if (light.color != null) ...[
+            const SizedBox(height: 18),
+            ColorSliders(
+              color:
+                  _colorDraft ?? HSVColor.fromColor(light.color!).withValue(1),
+              enabled: adjustable,
+              onChanged: (color) => setState(() => _colorDraft = color),
+              onChangeEnd: (color) =>
+                  _update(LightCommand(color: color.toColor())),
+            ),
+          ],
         ],
       ],
     );
@@ -243,7 +256,9 @@ class _LightDetailScreenState extends State<LightDetailScreen>
               ),
             ),
             Text(
-              '${l10n.temperatureFeel(kelvin.round())} ${kelvin.round()}K',
+              caps.nominalTemperature
+                  ? l10n.temperatureFeel(kelvin.round())
+                  : '${l10n.temperatureFeel(kelvin.round())} ${kelvin.round()}K',
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ],
@@ -254,6 +269,10 @@ class _LightDetailScreenState extends State<LightDetailScreen>
           min: caps.minTemperature!.toDouble(),
           max: caps.maxTemperature!.toDouble(),
           enabled: enabled,
+          semanticLabel: l10n.temperature,
+          semanticValue: (value) => caps.nominalTemperature
+              ? l10n.temperatureFeel(value.round())
+              : l10n.kelvin(value.round()),
           onChanged: (value) => setState(() => _temperatureDraft = value),
           onChangeEnd: (value) =>
               _update(LightCommand(temperature: value.round())),

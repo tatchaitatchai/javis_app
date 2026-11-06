@@ -14,7 +14,7 @@ import '../lighting/light_cards.dart';
 import '../lighting/provider_status_panel.dart';
 import '../lock/lock_card.dart';
 import '../lock/lock_store.dart';
-import '../pairing/device_type_screen.dart';
+import '../pairing/add_device_screen.dart';
 import '../scenes/scene_strip.dart';
 import '../voice/voice_screen.dart';
 import 'home_models.dart';

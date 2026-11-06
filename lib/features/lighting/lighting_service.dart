@@ -52,8 +52,12 @@ enum BluetoothState { unknown, on, off, unauthorized, unsupported }
 /// the current scan; vendor identifiers stay in the native adapter.
 @immutable
 class NearbyDevice {
-  const NearbyDevice(this.id);
+  const NearbyDevice(this.id, {this.name, this.iconUrl});
   final String id;
+
+  /// The product's name and picture, when the provider has them.
+  final String? name;
+  final String? iconUrl;
 }
 
 @immutable
@@ -108,6 +112,7 @@ class LightCapabilities {
     this.color = false,
     this.minTemperature,
     this.maxTemperature,
+    this.nominalTemperature = false,
   });
   static const demo = LightCapabilities(
     power: true,
@@ -123,6 +128,10 @@ class LightCapabilities {
   final bool color;
   final int? minTemperature;
   final int? maxTemperature;
+
+  /// The Kelvin scale is the app's own: the light reports no real figure, so
+  /// the UI shows a warm-to-cool feel instead of a number.
+  final bool nominalTemperature;
   bool get hasTemperatureRange =>
       temperature &&
       minTemperature != null &&
@@ -399,8 +408,20 @@ abstract class LightingService extends ChangeNotifier {
 }
 
 class MockLightingService extends LightingService {
-  MockLightingService({this.pairingDelay = const Duration(milliseconds: 1400)});
+  MockLightingService({
+    this.pairingDelay = const Duration(milliseconds: 1400),
+    this.scanDelay = const Duration(milliseconds: 1800),
+  });
   final Duration pairingDelay;
+
+  /// How long the sample scan takes to find each sample device.
+  final Duration scanDelay;
+  static const _sampleNearby = [
+    NearbyDevice('demo-bulb', name: 'Smart bulb'),
+    NearbyDevice('demo-lamp', name: 'Table lamp'),
+  ];
+  Timer? _scanTimer;
+  List<NearbyDevice> _nearby = const [];
   final List<LightDevice> _devices = [
     const LightDevice(
       id: 'living-lamp',
@@ -446,6 +467,38 @@ class MockLightingService extends LightingService {
   bool get isDemo => true;
   @override
   LightingReadiness get readiness => LightingReadiness.ready;
+  @override
+  BluetoothState get bluetooth => BluetoothState.on;
+  @override
+  List<NearbyDevice> get nearbyDevices => _nearby;
+  @override
+  bool get scanning => _scanTimer != null;
+  @override
+  Future<void> startDeviceScan() async {
+    _scanTimer?.cancel();
+    _nearby = const [];
+    _scanTimer = Timer.periodic(scanDelay, (timer) {
+      _nearby = _sampleNearby.take(_nearby.length + 1).toList(growable: false);
+      if (_nearby.length == _sampleNearby.length) timer.cancel();
+      changed();
+    });
+    changed();
+  }
+
+  /// Silent: this runs while the add-device screen is leaving the tree.
+  @override
+  Future<void> stopDeviceScan() async {
+    _scanTimer?.cancel();
+    _scanTimer = null;
+    _nearby = const [];
+  }
+
+  @override
+  void dispose() {
+    _scanTimer?.cancel();
+    super.dispose();
+  }
+
   @override
   List<LightDevice> get devices => List.unmodifiable(_devices);
   @override

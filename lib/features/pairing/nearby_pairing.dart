@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/motion/entrance.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/widgets/calm_sheet.dart';
 import '../../core/widgets/calm_surfaces.dart';
 import '../lighting/lighting_service.dart';
+import 'nearby_device_icon.dart';
+import 'nearby_radar.dart';
 
-/// Bluetooth state and the lights found so far (spec 013).
+/// The radar, the search status and everything found so far (spec 018).
 class NearbyScanView extends StatelessWidget {
   const NearbyScanView({
     required this.bluetooth,
@@ -33,6 +34,12 @@ class NearbyScanView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        NearbyRadar(
+          devices: devices,
+          searching: blocked == null,
+          onChoose: onChoose,
+        ),
+        const SizedBox(height: 14),
         if (blocked != null)
           Semantics(
             liveRegion: true,
@@ -43,42 +50,31 @@ class NearbyScanView extends StatelessWidget {
             ),
           )
         else
-          CalmPanel(
-            child: Row(
-              children: [
-                const SizedBox.square(
-                  dimension: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Semantics(
-                    liveRegion: true,
-                    child: Text(l10n.nearbySearching),
-                  ),
-                ),
-              ],
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              devices.isEmpty
+                  ? l10n.nearbySearching
+                  : l10n.nearbyFoundCount(devices.length),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
         const SizedBox(height: 14),
-        if (devices.isEmpty)
+        if (devices.isNotEmpty)
+          _FoundDevices(devices: devices, onChoose: onChoose)
+        else if (blocked == null)
           InfoNote(
-            icon: CupertinoIcons.lightbulb,
+            icon: CupertinoIcons.info_circle,
             text: l10n.nearbySearchingHint,
-          )
-        else
-          NearbyDeviceList(devices: devices, onChoose: onChoose),
+          ),
       ],
     );
   }
 }
 
-class NearbyDeviceList extends StatelessWidget {
-  const NearbyDeviceList({
-    required this.devices,
-    required this.onChoose,
-    super.key,
-  });
+class _FoundDevices extends StatelessWidget {
+  const _FoundDevices({required this.devices, required this.onChoose});
 
   final List<NearbyDevice> devices;
   final ValueChanged<String> onChoose;
@@ -91,16 +87,21 @@ class NearbyDeviceList extends StatelessWidget {
       children: [
         for (var i = 0; i < devices.length; i++)
           Entrance(
-            order: i,
+            key: ValueKey('nearby-${devices[i].id}'),
             child: ListRow(
-              key: ValueKey('nearby-${devices[i].id}'),
-              leading: Icon(
-                CupertinoIcons.lightbulb_fill,
-                color: palette.accentDeep,
+              leading: Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: palette.accentTint,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: NearbyDeviceIcon(device: devices[i], size: 24),
               ),
-              title: context.l10n.nearbyLight(i + 1),
+              title: context.nearbyDeviceName(devices[i], i),
               subtitle: context.l10n.nearbyReady,
-              chevron: true,
+              trailing: const _AddLabel(),
               onTap: () => onChoose(devices[i].id),
             ),
           ),
@@ -109,34 +110,27 @@ class NearbyDeviceList extends StatelessWidget {
   }
 }
 
-/// Slides up when the scan first finds something, like a system accessory
-/// prompt. Resolves to the chosen [NearbyDevice.id], or null when dismissed.
-Future<String?> showNearbyFoundSheet(
-  BuildContext context,
-  LightingService service,
-) => showCalmSheet<String>(
-  context: context,
-  builder: (sheetContext) => ListenableBuilder(
-    listenable: service,
-    builder: (_, _) => Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          sheetContext.l10n.nearbyFoundTitle,
-          style: Theme.of(sheetContext).textTheme.headlineSmall,
+/// Looks like a button, but the whole row is the tap target.
+class _AddLabel extends StatelessWidget {
+  const _AddLabel();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: palette.strong,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        context.l10n.nearbyAdd,
+        style: TextStyle(
+          color: palette.onStrong,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
         ),
-        const SizedBox(height: 6),
-        Text(
-          sheetContext.l10n.nearbyFoundBody,
-          style: Theme.of(sheetContext).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 12),
-        NearbyDeviceList(
-          devices: service.nearbyDevices,
-          onChoose: (id) => Navigator.of(sheetContext).pop(id),
-        ),
-      ],
-    ),
-  ),
-);
+      ),
+    );
+  }
+}

@@ -1,7 +1,10 @@
 # Bluetooth nearby-device pairing
 
 Status: Implemented on iOS; physical BLE pairing observed  
-Last updated: 2026-11-01
+Last updated: 2026-11-06
+
+The entry screen and the found-device sheet below were replaced by
+`018-nearby-radar.md`. The bridge and activation described here still apply.
 
 Adds a Bluetooth-first path in front of the Wi-Fi paths in
 `008-discovery-first-pairing.md` (AP/AP+) and `009-fast-blink-ez-pairing.md`

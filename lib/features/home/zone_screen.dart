@@ -9,7 +9,7 @@ import '../../core/widgets/calm_surfaces.dart';
 import '../../core/widgets/flow_page.dart';
 import '../lighting/light_cards.dart';
 import '../lighting/lighting_service.dart';
-import '../pairing/device_type_screen.dart';
+import '../pairing/add_device_screen.dart';
 import '../scenes/scene_editor_screen.dart';
 import '../scenes/scene_strip.dart';
 import 'home_settings_screen.dart';

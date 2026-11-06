@@ -139,6 +139,19 @@ Not checked on the Simulator, covered only as listed:
   the Simulator has no Tuya SDK, so it used demo lights. `home_store_test.dart`
   covers the claim rules against a fake.
 
+Run on 2026-11-06 on a physical iPhone, as a profile build with `JAVIS_API_URL`
+set to the Mac's LAN address and `JAVIS_LIGHTING_PROVIDER=tuya`, against the local
+API over plain HTTP. The API log and the local database match each step:
+
+- OTP request, wrong code, right code, profile, and create home.
+- The paired light was claimed through `POST /v1/homes/{homeId}/devices`, and the
+  database holds its registry row.
+- Sign-out, then the same number returned to the saved home. The owner confirmed
+  that nothing had to be entered again.
+
+Not checked on the physical iPhone: scene runs on the real light, and whether the
+light was online during this run.
+
 ## Current status
 
 Implemented for accounts, homes, members, invites, scenes and the device registry.

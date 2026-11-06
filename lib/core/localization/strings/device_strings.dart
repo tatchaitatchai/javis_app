@@ -5,6 +5,8 @@ extension DeviceStrings on AppLocalizations {
   String get online => _t('Online', 'ออนไลน์');
   String get notResponding => _t('Not responding', 'ไม่ตอบสนอง');
   String powerOf(String name) => _t('$name power', 'เปิดปิด $name');
+  String get hue => _t('Color', 'สี');
+  String get saturation => _t('Saturation', 'ความเข้มสี');
   String temperatureFeel(int kelvin) => kelvin < 3500
       ? _t('Warm', 'โทนอุ่น')
       : kelvin < 5000
@@ -76,30 +78,10 @@ extension DeviceStrings on AppLocalizations {
     _ => _t('Locked automatically', 'ล็อกอัตโนมัติ'),
   };
 
-  String get whatToAdd => _t('What are you adding?', 'เพิ่มอุปกรณ์อะไร');
-  String addingTo(String home) => _t('Adding to $home', 'จะเพิ่มเข้า $home');
-  String get deviceTypeBulb => _t('Light bulb', 'หลอดไฟ');
-  String get deviceTypeLock => _t('Door lock', 'กลอนประตู');
-  String get deviceTypeProtocol =>
-      _t('Wi-Fi · Tuya / Smart Life', 'Wi-Fi · Tuya / Smart Life');
-  String get comingSoon => _t('Coming soon', 'เร็ว ๆ นี้');
-  String get lockPairingLater => _t(
-    'Adding a door lock is not in this version yet.',
-    'การเพิ่มกลอนประตูยังไม่มีในเวอร์ชันนี้',
-  );
-  String get beforeYouStart => _t('Before you start', 'ก่อนเริ่ม');
-  String get beforeYouStartBody => _t(
-    'Keep your phone near the device and use your home’s 2.4 GHz Wi-Fi. It takes about a minute.',
-    'วางมือถือใกล้อุปกรณ์ และใช้ Wi-Fi บ้านคลื่น 2.4 GHz ใช้เวลาประมาณ 1 นาที',
-  );
-  String get moreDevicesLater => _t(
-    'Light bulbs for now. More device types come in later versions.',
-    'ตอนนี้รองรับหลอดไฟ อุปกรณ์ชนิดอื่นจะเพิ่มในเวอร์ชันถัดไป',
-  );
   String get stepSendWifi =>
-      _t('Send home Wi-Fi to the bulb', 'ส่ง Wi-Fi บ้านให้หลอด');
+      _t('Send home Wi-Fi to the device', 'ส่ง Wi-Fi บ้านให้อุปกรณ์');
   String get stepWaitOnline =>
-      _t('Wait for the bulb to come online', 'รอหลอดออนไลน์');
+      _t('Wait for the device to come online', 'รออุปกรณ์ออนไลน์');
   String stepAddToHome(String home) => _t('Add to $home', 'เพิ่มเข้า $home');
   String get band24 => _t('2.4 GHz', '2.4 GHz');
   String get wifi24Only => _t(

@@ -176,8 +176,6 @@ class AppLocalizations {
   String get addLight => _t('Add a light', 'เพิ่มหลอดไฟ');
   String get moreHome =>
       _t('One more way to feel at home', 'เติมความเป็นบ้านอีกนิด');
-  String get pairingPrepare =>
-      _t('Bring a little\nlight home.', 'เติมแสงไฟ\nให้บ้านของคุณ');
   String get pairingSearching =>
       _t('Finding your\nnew glow…', 'กำลังค้นหา\nแสงไฟดวงใหม่…');
   String get pairingFound =>
@@ -269,10 +267,6 @@ class AppLocalizations {
     'Set up a private demo home for this iPhone. We’ll keep it ready for your next visit.',
     'ตั้งค่าบ้านเดโมสำหรับ iPhone เครื่องนี้ แล้วกลับมาใช้ต่อได้ครั้งหน้า',
   );
-  String get pairingDemoHint => _t(
-    'Explore each step with a sample bulb. No real device will be changed.',
-    'ลองทุกขั้นตอนด้วยหลอดไฟตัวอย่าง โดยไม่กระทบอุปกรณ์จริง',
-  );
   String get pairingNetworkIntro => _t(
     'Enter your 2.4 GHz network, then get the bulb ready to pair.',
     'กรอก Wi-Fi 2.4 GHz แล้วเตรียมหลอดไฟให้พร้อมเชื่อมต่อ',
@@ -311,10 +305,6 @@ class AppLocalizations {
   );
   String get pairingPreparedAction =>
       _t('I’ve joined the bulb Wi-Fi', 'เชื่อมต่อ Wi-Fi ของหลอดแล้ว');
-  String get prepareDescription => _t(
-    'This is a guided pairing prototype. You can explore the experience without connecting a physical bulb.',
-    'นี่คือขั้นตอนเชื่อมต่อแบบจำลอง คุณสามารถลองใช้งานได้โดยไม่ต้องเชื่อมต่อหลอดไฟจริง',
-  );
   String get searchingDescription => _t(
     'Simulating discovery. No Bluetooth or Wi-Fi scan is running.',
     'กำลังจำลองการค้นหา ไม่มีการสแกน Bluetooth หรือ Wi-Fi จริง',
@@ -351,7 +341,6 @@ class AppLocalizations {
       _t('Preview a failed search', 'ทดลองสถานะค้นหาไม่สำเร็จ');
   String get optionalDemo =>
       _t('Optional demo state', 'สถานะตัวอย่าง เลือกเปิดได้');
-  String get startPairing => _t('Start demo pairing', 'เริ่มเชื่อมต่อตัวอย่าง');
   String get searchingDevices =>
       _t('Searching sample devices…', 'กำลังค้นหาอุปกรณ์ตัวอย่าง…');
   String get sampleRoom =>

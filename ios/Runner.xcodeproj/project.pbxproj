@@ -13,6 +13,7 @@
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		A7C15E2D4F3B4D6A8E1F0C01 /* SessionVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C15E2D4F3B4D6A8E1F0C02 /* SessionVault.swift */; };
 		C4E27A1B5D3F4E6B9A2C1D01 /* ThemePreferenceBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E27A1B5D3F4E6B9A2C1D02 /* ThemePreferenceBridge.swift */; };
+		D5F38B2C6E4A5F7CAB3D2E01 /* TuyaLightProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F38B2C6E4A5F7CAB3D2E02 /* TuyaLightProfile.swift */; };
 		B694F93D328A4AA29822C101 /* TuyaLightingAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B694F93D328A4AA29822C102 /* TuyaLightingAdapter.swift */; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
@@ -58,6 +59,7 @@
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A7C15E2D4F3B4D6A8E1F0C02 /* SessionVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionVault.swift; sourceTree = "<group>"; };
 		C4E27A1B5D3F4E6B9A2C1D02 /* ThemePreferenceBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemePreferenceBridge.swift; sourceTree = "<group>"; };
+		D5F38B2C6E4A5F7CAB3D2E02 /* TuyaLightProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TuyaLightProfile.swift; sourceTree = "<group>"; };
 		B694F93D328A4AA29822C102 /* TuyaLightingAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TuyaLightingAdapter.swift; sourceTree = "<group>"; };
 		7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		78E0A7A72DC9AD7400C4905E /* FlutterGeneratedPluginSwiftPackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FlutterGeneratedPluginSwiftPackage; path = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage; sourceTree = "<group>"; };
@@ -164,6 +166,7 @@
 				B694F93D328A4AA29822C102 /* TuyaLightingAdapter.swift */,
 				A7C15E2D4F3B4D6A8E1F0C02 /* SessionVault.swift */,
 				C4E27A1B5D3F4E6B9A2C1D02 /* ThemePreferenceBridge.swift */,
+				D5F38B2C6E4A5F7CAB3D2E02 /* TuyaLightProfile.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
@@ -439,6 +442,7 @@
 				B694F93D328A4AA29822C101 /* TuyaLightingAdapter.swift in Sources */,
 				A7C15E2D4F3B4D6A8E1F0C01 /* SessionVault.swift in Sources */,
 				C4E27A1B5D3F4E6B9A2C1D01 /* ThemePreferenceBridge.swift in Sources */,
+				D5F38B2C6E4A5F7CAB3D2E01 /* TuyaLightProfile.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 			);

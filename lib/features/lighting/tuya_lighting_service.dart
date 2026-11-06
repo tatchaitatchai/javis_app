@@ -508,15 +508,7 @@ class TuyaLightingService extends LightingService {
       case 'nearby':
         final found = value['devices'];
         if (!_scanning || found is! List) return;
-        _nearby = List.unmodifiable(
-          {
-            for (final item in found)
-              if (item is Map &&
-                  item['id'] is String &&
-                  (item['id'] as String).isNotEmpty)
-                item['id'] as String,
-          }.map(NearbyDevice.new),
-        );
+        _nearby = _parseNearby(found);
         changed();
       case 'pairing':
         final operationId = value['operationId'];
@@ -618,6 +610,7 @@ class TuyaLightingService extends LightingService {
           maxTemperature: capabilities['maxTemperature'] is int
               ? capabilities['maxTemperature'] as int
               : null,
+          nominalTemperature: capabilities['nominalTemperature'] == true,
         ),
       );
     }
@@ -629,6 +622,30 @@ class TuyaLightingService extends LightingService {
           .where((r) => r.name == value && r != LightingReadiness.initializing)
           .firstOrNull ??
       LightingReadiness.transportFailure;
+
+  /// One entry per id. Only `https` pictures are kept.
+  static List<NearbyDevice> _parseNearby(List<Object?> found) {
+    final byId = <String, NearbyDevice>{};
+    for (final item in found) {
+      if (item is! Map) continue;
+      final id = item['id'];
+      if (id is! String || id.isEmpty) continue;
+      final name = item['name'];
+      final icon = item['iconUrl'];
+      byId.putIfAbsent(
+        id,
+        () => NearbyDevice(
+          id,
+          name: name is String && name.trim().isNotEmpty ? name.trim() : null,
+          iconUrl: icon is String && Uri.tryParse(icon)?.scheme == 'https'
+              ? icon
+              : null,
+        ),
+      );
+    }
+    return List.unmodifiable(byId.values);
+  }
+
   static BluetoothState _parseBluetooth(Object? value) =>
       BluetoothState.values.where((s) => s.name == value).firstOrNull ??
       BluetoothState.unknown;
