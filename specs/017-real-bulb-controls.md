@@ -1,6 +1,6 @@
 # Real bulb controls
 
-Status: Implemented, hardware checks open
+Status: Implemented, checked on the owner's bulb
 Last updated: 2026-11-06
 
 ## Context
@@ -83,6 +83,9 @@ Run on 2026-11-06.
 - `dart format --output=none --set-exit-if-changed .`, `flutter analyze` and
   `flutter test` pass, and the iOS profile build passes with the Tuya provider.
 
-Not verified: the controls on the physical bulb. It reported offline in the sessions
-where this was tried, so no command has been confirmed on it. `TuyaLightProfile` has
-been checked only against the schema read from the iPhone.
+Run on 2026-11-06 on the owner's iPhone, after pairing the bulb again through the
+radar: the owner confirmed that power, brightness, white, colour and scenes all work
+on the physical bulb.
+
+Not verified: why the bulb reported offline in earlier sessions, or whether that will
+return. Other bulb models are untested.

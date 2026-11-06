@@ -85,9 +85,12 @@ with no name shows a numbered "New device"; one with no icon shows a generic ico
 
 ## Risks
 
-- Unverified: the dictionary keys. Tuya's docs say the query returns the device name
-  and do not list the keys. The adapter reads `name` and `icon`. If they differ, the
-  screen falls back to the generic label and icon until this is fixed.
+- Tuya's docs say the query returns the device name and do not list the keys. A real
+  bulb returned both `name` and `icon` on 2026-11-06. Other products are untested, and
+  a missing key falls back to the generic label and icon.
+- A blinking bulb can be missing from the scan. On 2026-11-06 the iPhone received no
+  advertisement from one until it was powered off for 10 seconds and on again. Why it
+  was silent before that is not known.
 - A paired lock lands in the home through the light model, so it shows as a device
   with no controls and is registered with kind `light` until the lock work is done.
 - Copy on later steps of the Wi-Fi fallback still says "bulb", which is accurate for
@@ -105,9 +108,13 @@ Run on 2026-11-06.
 - `flutter build ios --profile` passes with the real Tuya provider, and that build is
   on the owner's iPhone.
 
-Not verified yet: the real scan on the iPhone with the new screen, the real keys of
-Tuya's product dictionary, product icons, the 60 fps target on hardware (the debug
-Simulator is too slow to judge), and the Bluetooth off or denied states on the device.
+Run on 2026-11-06 on the owner's iPhone, as a profile build with the Tuya provider and
+the local API: the radar found a real bulb and paired it. The API recorded the claim
+and the rename, and Tuya then reported the bulb online over both cloud and LAN.
+
+Not verified yet: how the real name and product icon look on the radar, the 60 fps
+target on hardware (the debug Simulator is too slow to judge), and the Bluetooth off
+or denied states on the device.
 
 ## Current status
 
